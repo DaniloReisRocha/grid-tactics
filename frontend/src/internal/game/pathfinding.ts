@@ -1,5 +1,5 @@
 import type { Cell, Position, UnitInstance } from "@/api/models";
-import { getDestination } from "@/components/ProceduralMap/characterMovement";
+import { getDestination, movementCost } from "@/components/ProceduralMap/characterMovement";
 
 export const positionKey = ({ x, y }: Position) => `${x},${y}`;
 
@@ -28,7 +28,7 @@ export function movementOptions(board: Cell[], unit: UnitInstance, units: UnitIn
         const sideY = positionKey({ x: current.x, y: next.y });
         if (!cells.has(sideX) || !cells.has(sideY) || blocked.has(sideX) || blocked.has(sideY)) continue;
       }
-      const cost = current.cost + 1 + cell.elevation;
+      const cost = current.cost + movementCost(from, cell);
       if (cost > unit.currentStamina || cost >= (costs.get(nextKey) ?? Infinity)) continue;
       costs.set(nextKey, cost);
       paths.set(nextKey, [...paths.get(key)!, next]);

@@ -22,7 +22,8 @@ test("movement prefers cheap terrain and respects stamina, occupied corners and 
   const { movementOptions } = compile("internal/game/pathfinding.ts");
   const board = [];
   for (let y = 0; y < 3; y++) for (let x = 0; x < 5; x++) {
-    board.push({ x, y, terrain: "grass", height: 0, elevation: y === 1 && x > 0 && x < 4 ? 2 : 0 });
+    const height = y === 1 && x > 0 && x < 4 ? 2 : 0;
+    board.push({ x, y, terrain: "grass", height, elevation: height });
   }
   const unit = { x: 0, y: 1, currentStamina: 4, currentLife: 3, unit: { id: "a" } };
   const options = movementOptions(board, unit, [unit]);
@@ -37,7 +38,7 @@ test("movement prefers cheap terrain and respects stamina, occupied corners and 
   assert.equal(blocked.costs.get("1,0"), 2); // Must walk around the occupied corner.
 });
 
-test("multiplayer terrain blocks forests, cliffs and water; bridges enforce orientation", () => {
+test("multiplayer terrain blocks forests and water; bridges enforce orientation", () => {
   const { movementOptions } = compile("internal/game/pathfinding.ts");
   const unit = { x: 0, y: 0, currentStamina: 20, currentLife: 3, unit: { id: "a" } };
   const board = [0, 1, 2].map((x) => ({ x, y: 0, terrain: "grass", height: 0, elevation: 0 }));
@@ -51,7 +52,27 @@ test("multiplayer terrain blocks forests, cliffs and water; bridges enforce orie
   board[1].object = "forest";
   assert.equal(movementOptions(board, unit, [unit]).paths.has("2,0"), false);
   delete board[1].object; board[1].height = 2;
-  assert.equal(movementOptions(board, unit, [unit]).paths.has("2,0"), false);
+  assert.equal(movementOptions(board, unit, [unit]).costs.get("2,0"), 4);
+});
+
+test("stamina charges uphill differences only, caps the bonus at 2 and previews cumulative costs", () => {
+  const { movementCost } = compile("components/ProceduralMap/characterMovement.ts");
+  for (const [from, to, expected] of [[0,0,1],[2,2,1],[3,3,1],[0,1,2],[1,2,2],[2,3,2],[0,2,3],[0,3,3],[0,8,3],[3,2,1],[3,0,1]]) {
+    assert.equal(movementCost({height:from},{height:to}),expected,`height ${from} -> ${to}`);
+  }
+  const { movementOptions } = compile("internal/game/pathfinding.ts");
+  const board = [0,1,1,3,3,1,2].map((height,x)=>({x,y:0,height,elevation:height,terrain:"grass"}));
+  const unit = { x:0,y:0,currentStamina:10,currentLife:3,unit:{id:"a"} };
+  const options = movementOptions(board,unit,[unit]);
+  assert.equal(options.costs.get("1,0"),2);
+  assert.equal(options.costs.get("2,0"),3);
+  assert.equal(options.costs.get("3,0"),6);
+  assert.equal(options.costs.get("4,0"),7);
+  assert.equal(options.costs.get("5,0"),8);
+  assert.equal(options.costs.get("6,0"),10);
+  assert.equal(movementOptions(board,{...unit,currentStamina:5},[unit]).paths.has("3,0"),false);
+  const elevated = { ...unit, x:3, currentStamina:2 };
+  assert.equal(movementOptions(board,elevated,[elevated]).costs.get("5,0"),2);
 });
 
 test("each player has a distinct stable character model from the three sheet blocks", () => {
@@ -64,6 +85,24 @@ test("each player has a distinct stable character model from the three sheet blo
     assert.equal(playerAppearance(seed, 0).model, models[0]);
   }
   assert.equal(seen.size, 3);
+});
+
+test("only overlapping structures in front of the selected unit fade, then restore opacity", () => {
+  const { occludesUnit, approachOpacity, OCCLUDED_OPACITY } = compile("components/ProceduralMap/occlusion.ts");
+  const unit = { minX: 0, minY: 0, maxX: 32, maxY: 48 };
+  const overlap = { minX: 10, minY: 15, maxX: 70, maxY: 90 };
+  assert.equal(occludesUnit(unit, 15, overlap, 20), true);
+  assert.equal(occludesUnit(unit, 15, overlap, 10), false);
+  assert.equal(occludesUnit(unit, 15, overlap, 15), false);
+  assert.equal(occludesUnit(unit, 15, { ...overlap, minX: 40 }, 20), false);
+  assert.equal(occludesUnit(unit, 15, { ...overlap, minY: 50 }, 20), false);
+  // Moving beyond the obstacle stops the fade, without relying on a server position.
+  assert.equal(occludesUnit({ minX: 80, minY: 0, maxX: 112, maxY: 48 }, 15, overlap, 20), false);
+  let alpha = 1;
+  for (let frame = 0; frame < 60; frame++) alpha = approachOpacity(alpha, OCCLUDED_OPACITY, 16);
+  assert.equal(alpha, 0.2);
+  for (let frame = 0; frame < 60; frame++) alpha = approachOpacity(alpha, 1, 16);
+  assert.equal(alpha, 1);
 });
 
 function transport() {

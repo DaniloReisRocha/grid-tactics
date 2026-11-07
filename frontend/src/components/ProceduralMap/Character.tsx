@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTick } from "@pixi/react";
 import { Assets, Rectangle, Sprite, Texture } from "pixi.js";
 import sheetUrl from "@/assets/Small-8-Direction-Characters_by_AxulArt/Small-8-Direction-Characters_by_AxulArt.png";
@@ -12,6 +12,7 @@ interface CharacterProps {
   model?: CharacterModel;
   onSelect?: () => void;
   onHover?: (hovered: boolean) => void;
+  onSprite?: (sprite: Sprite | null) => void;
 }
 
 const FRAME_WIDTH = 16;
@@ -27,8 +28,12 @@ function project(tile: MapTile) {
   };
 }
 
-export default function Character({ spawn, path, onError, model = 2, onSelect, onHover }: CharacterProps) {
+export default function Character({ spawn, path, onError, model = 2, onSelect, onHover, onSprite }: CharacterProps) {
   const spriteRef = useRef<Sprite>(null);
+  const registerSprite = useCallback((sprite: Sprite | null) => {
+    spriteRef.current = sprite;
+    onSprite?.(sprite);
+  }, [onSprite]);
   const motion = useRef({ from: spawn, to: spawn, elapsed: STEP_MS, direction: 4, clock: 0 });
   const command = useRef<readonly MapTile[]>(path);
   const pending = useRef<MapTile[]>([]);
@@ -103,7 +108,7 @@ export default function Character({ spawn, path, onError, model = 2, onSelect, o
   const initial = project(spawn);
   return frames ? (
     <pixiSprite
-      ref={spriteRef}
+      ref={registerSprite}
       texture={frames[4][0]}
       x={initial.x} y={initial.y}
       anchor={{ x: 0.5, y: 0.875 }}

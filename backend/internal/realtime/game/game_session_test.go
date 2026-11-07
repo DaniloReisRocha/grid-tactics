@@ -63,12 +63,12 @@ func TestPathUsesCheapestTerrainAndBlocksCorners(t *testing.T) {
 			if y == 1 && x > 0 && x < 4 {
 				elevation = models.ElevationHigh
 			}
-			board = append(board, models.Cell{X: x, Y: y, Elevation: elevation})
+			board = append(board, models.Cell{X: x, Y: y, Elevation: elevation, Height: int(elevation)})
 		}
 	}
 	from, to := models.Position{X: 0, Y: 1}, models.Position{X: 4, Y: 1}
 	path := findPath(board, from, to, nil)
-	if len(path) == 0 || pathCost(board, path) != 4 {
+	if len(path) == 0 || pathCost(board, from, path) != 4 {
 		t.Fatalf("expected cheaper detour: %+v", path)
 	}
 	if same := findPath(board, from, from, nil); same == nil || len(same) != 0 {
@@ -101,11 +101,10 @@ func TestMovementOwnershipOccupancyStaminaAndTurn(t *testing.T) {
 		t.Fatal("moved without stamina")
 	}
 	s.Players[a].Units[0].CurrentStamina = 6
-	cell := s.Board[10]
 	if err := s.MovePiece(a, "a", models.Position{Y: 1}); err != nil {
 		t.Fatal(err)
 	}
-	if s.Players[a].Units[0].CurrentStamina != 6-(1+int(cell.Elevation)) {
+	if s.Players[a].Units[0].CurrentStamina != 5 {
 		t.Fatal("incorrect stamina cost")
 	}
 	s.Players[b].Units[0].CurrentStamina = 0

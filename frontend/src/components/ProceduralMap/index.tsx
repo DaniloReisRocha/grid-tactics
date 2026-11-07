@@ -3,6 +3,7 @@ import { Application, extend } from "@pixi/react";
 import { Assets, Container, Graphics, Polygon, Sprite, type FederatedPointerEvent, type Texture } from "pixi.js";
 import Minimap from "./Minimap";
 import MapActorRenderer from "./MapActor";
+import StructureOcclusion from "./StructureOcclusion";
 import type { MapActor, MapInteraction } from "./types";
 import { tileKey } from "./characterMovement";
 import {
@@ -51,6 +52,23 @@ export default function ProceduralMap({
   style,
 }: ProceduralMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const structures = useRef(new Map<string, Sprite>());
+  const structureRefs = useRef(new Map<string, (sprite: Sprite | null) => void>());
+  const selectedSprite = useRef<Sprite | null>(null);
+  const registerSelectedSprite = useCallback((sprite: Sprite | null) => { selectedSprite.current = sprite; }, []);
+  const structureRef = (key: string) => {
+    let callback = structureRefs.current.get(key);
+    if (!callback) {
+      callback = (sprite: Sprite | null) => {
+        const previous = structures.current.get(key);
+        if (previous && previous !== sprite && !previous.destroyed) previous.alpha = 1;
+        if (sprite) structures.current.set(key, sprite);
+        else structures.current.delete(key);
+      };
+      structureRefs.current.set(key, callback);
+    }
+    return callback;
+  };
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [textures, setTextures] = useState<TextureMap | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -185,6 +203,7 @@ export default function ProceduralMap({
                     return (
                       <pixiSprite
                         key={`ground-${level}`}
+                        ref={level > 0 ? structureRef(`${tile.x},${tile.y}:ground:${level}`) : undefined}
                         texture={textures[asset]}
                         y={-level * LEVEL_HEIGHT}
                         scale={SPRITE_SCALE}
@@ -210,6 +229,7 @@ export default function ProceduralMap({
                   ) : null}
                   {tile.object ? (
                     <pixiSprite
+                      ref={structureRef(`${tile.x},${tile.y}:object`)}
                       texture={textures[tile.object]}
                       y={surfaceY - OBJECT_RULES[tile.object].surfaceOffset}
                       scale={SPRITE_SCALE}
@@ -218,6 +238,7 @@ export default function ProceduralMap({
                   ) : null}
                   {tile.object === "house" && tile.roof ? (
                     <pixiSprite
+                      ref={structureRef(`${tile.x},${tile.y}:roof`)}
                       texture={textures[tile.roof]}
                       y={surfaceY - LEVEL_HEIGHT * 2}
                       scale={SPRITE_SCALE}
@@ -231,8 +252,10 @@ export default function ProceduralMap({
               <MapActorRenderer key={actor.id} actor={actor}
                 onSelect={interaction?.onSelect}
                 onHover={(tile) => { setHover(tile ? { tiles, tile } : null); interaction?.onHover(tile); }}
+                onSelectedSprite={registerSelectedSprite}
                 onError={reportCharacterError} />
             ))}
+            <StructureOcclusion structures={structures} selectedSprite={selectedSprite} />
           </pixiContainer>
         ) : null}
       </Application>

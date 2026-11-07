@@ -46,8 +46,8 @@ func TestTerrainTraversalAndSpawn(t *testing.T) {
 		t.Fatal("bridge entered sideways")
 	}
 	cliff := models.Cell{X: 1, Y: 0, Terrain: "grass", Height: 2}
-	if CanTraverse(grass, cliff) {
-		t.Fatal("two-level cliff accepted")
+	if !CanTraverse(grass, cliff) {
+		t.Fatal("multi-level climb rejected despite stamina-based movement")
 	}
 	cliff.Height = 1
 	cliff.Object = "forest"

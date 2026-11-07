@@ -29,7 +29,7 @@ O frontend usa `ws://<hostname>:8080/api/game-connect` em HTTP e `wss://` em HTT
 2. Informe o nome da sessão e entre.
 3. Em outra aba, gere outra conta e entre na mesma sessão.
 4. No seu turno, selecione uma unidade. O hover mostra a rota e o clique envia o destino ao servidor.
-5. Cada passo custa `1 + elevação` de stamina. Unidades vivas, árvores, rochas e estruturas bloqueiam o caminho. Água só pode ser atravessada por pontes, no sentido da ponte; diagonais não cortam obstáculos e desníveis maiores que um cubo não são transitáveis.
+5. Cada passo custa `1 + min(2, max(0, altura do destino - altura de origem))` de stamina. No mesmo nível ou descendo, o custo é 1; subir um nível custa 2 e subir dois ou mais níveis custa 3. O adicional é calculado a cada passo, não pela altitude absoluta do terreno. Unidades vivas, árvores, rochas e estruturas bloqueiam o caminho. Água só pode ser atravessada por pontes, no sentido da ponte; diagonais não cortam obstáculos.
 6. Para atacar, selecione uma unidade sua, clique em **Atacar** e escolha um inimigo em alcance. A pistola causa 4 de dano, tem alcance 2 e custa 2 de stamina. Escudo absorve dano antes da vida.
 7. Finalizar o turno passa a vez e recupera a stamina das unidades vivas do próximo jogador.
 

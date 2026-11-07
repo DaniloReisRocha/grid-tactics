@@ -55,7 +55,7 @@ func TestSpawnsKeepFiveTileDistanceAndTwoFreeExits(t *testing.T) {
 			for _, d := range [][2]int{{1, 0}, {0, 1}, {-1, 0}, {0, -1}} {
 				position := models.Position{X: unit.X + d[0], Y: unit.Y + d[1]}
 				next, exists := cells[position]
-				if exists && !occupied[position] && CanTraverse(cell, next) && 1+int(next.Elevation) <= unit.CurrentStamina {
+				if exists && !occupied[position] && CanTraverse(cell, next) && movementCost(cell, next) <= unit.CurrentStamina {
 					exits++
 				}
 			}

@@ -28,7 +28,7 @@ func (s *GameSession) MovePiece(id uuid.UUID, unitID string, to models.Position)
 		if path == nil {
 			return errors.New("destino inacessível")
 		}
-		cost := pathCost(s.Board, path)
+		cost := pathCost(s.Board, unit.Position, path)
 		if cost > unit.CurrentStamina {
 			return errors.New("stamina insuficiente")
 		}
@@ -41,7 +41,7 @@ func (s *GameSession) MovePiece(id uuid.UUID, unitID string, to models.Position)
 	return errors.New("unidade não pertence ao jogador")
 }
 
-// Dijkstra: terrain has nonuniform cost (1 + elevation); BFS is not sufficient.
+// Dijkstra: movement cost depends on the upward height difference of each edge.
 func findPath(board []models.Cell, from, to models.Position, blocked map[models.Position]bool) []models.Position {
 	cells := make(map[models.Position]models.Cell, len(board))
 	for _, cell := range board {
@@ -97,7 +97,7 @@ func findPath(board []models.Cell, from, to models.Position, blocked map[models.
 					continue
 				}
 			}
-			cost := current.cost + 1 + int(cell.Elevation)
+			cost := current.cost + movementCost(cells[current.position], cell)
 			previous, seen := costs[next]
 			if seen && previous <= cost {
 				continue
@@ -110,15 +110,15 @@ func findPath(board []models.Cell, from, to models.Position, blocked map[models.
 	return nil
 }
 
-func pathCost(board []models.Cell, path []models.Position) int {
+func pathCost(board []models.Cell, from models.Position, path []models.Position) int {
+	cells := make(map[models.Position]models.Cell, len(board))
+	for _, cell := range board {
+		cells[models.Position{X: cell.X, Y: cell.Y}] = cell
+	}
 	cost := 0
 	for _, position := range path {
-		for _, cell := range board {
-			if cell.X == position.X && cell.Y == position.Y {
-				cost += 1 + int(cell.Elevation)
-				break
-			}
-		}
+		cost += movementCost(cells[from], cells[position])
+		from = position
 	}
 	return cost
 }

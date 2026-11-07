@@ -7,9 +7,14 @@ func walkable(cell models.Cell) bool {
 	return isBridge(cell) || (cell.Terrain != "water" && cell.Object == "")
 }
 
+// Moving laterally or downhill costs 1. Only climbing adds up to 2 stamina.
+func movementCost(from, to models.Cell) int {
+	return 1 + min(2, max(0, to.Height-from.Height))
+}
+
 // CanTraverse is shared by spawn connectivity and weighted pathfinding.
 func CanTraverse(from, to models.Cell) bool {
-	if !walkable(from) || !walkable(to) || abs(from.Height-to.Height) > 1 {
+	if !walkable(from) || !walkable(to) {
 		return false
 	}
 	dx, dy := abs(from.X-to.X), abs(from.Y-to.Y)
