@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { GameStatePayload } from "@/api/models";
 import { GameSocket, MessageType, type ConnectionStatus } from "@/api/webSocket/GameSocket";
+import { canUnitAttack, isAttackTarget } from "@/internal/game/combat";
 
 const emptyGame: GameStatePayload = {
   id: "", players: {}, board: [], turnOrder: [], currentTurn: null,
@@ -42,7 +43,15 @@ export const gameStore = create<GameStore>((set, get) => {
       set({ ...emptyGame, accountID: "", unitID: null, attackMode: false, error: null, pending: false });
     },
     movePiece: (unitID, x, y) => act(MessageType.movePiece, { unitID, to: { x, y } }),
-    attackPiece: (unitID, x, y) => act(MessageType.attackPiece, { unitID, to: { x, y } }),
+    attackPiece: (unitID, x, y) => {
+      const state = get();
+      const attacker = state.players[state.accountID]?.units.find((unit) => unit.unit.id === unitID);
+      const target = Object.values(state.players).flatMap((player) => player.units)
+        .find((unit) => unit.x === x && unit.y === y && unit.currentLife > 0);
+      // An empty/invalid slot must not send an action or change attack mode/pending state.
+      if (!attacker || !isAttackTarget(attacker, target)) return;
+      act(MessageType.attackPiece, { unitID, to: { x, y } });
+    },
     endTurn: () => act(MessageType.endTurn),
   };
 });
@@ -61,7 +70,8 @@ GameSocket.subscribe((message) => {
       ...payload, pending: false, error: null,
       board: JSON.stringify(payload.board) === JSON.stringify(state.board) ? state.board : payload.board,
       unitID: selected ? state.unitID : null,
-      attackMode: state.attackMode && payload.currentTurn === state.accountID && payload.status === "playing",
+      attackMode: state.attackMode && payload.currentTurn === state.accountID && payload.status === "playing"
+        && Boolean(selected && canUnitAttack(selected)),
     });
   }
 });

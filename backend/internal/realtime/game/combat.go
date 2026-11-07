@@ -23,6 +23,9 @@ func (s *GameSession) Attack(id uuid.UUID, unitID string, target models.Position
 	if attacker == nil || attacker.CurrentLife <= 0 {
 		return errors.New("atacante inválido")
 	}
+	if attacker.HasAttacked {
+		return errors.New("esta unidade já atacou neste turno")
+	}
 	if len(attacker.Unit.Weapons) == 0 {
 		return errors.New("unidade sem arma")
 	}
@@ -30,10 +33,6 @@ func (s *GameSession) Attack(id uuid.UUID, unitID string, target models.Position
 	dx, dy := abs(attacker.X-target.X), abs(attacker.Y-target.Y)
 	if max(dx, dy) > weapon.Range {
 		return errors.New("alvo fora de alcance")
-	}
-	cost := max(1, weapon.StaminaPenalty)
-	if attacker.CurrentStamina < cost {
-		return errors.New("stamina insuficiente")
 	}
 	for owner, enemy := range s.Players {
 		if owner == id {
@@ -48,7 +47,7 @@ func (s *GameSession) Attack(id uuid.UUID, unitID string, target models.Position
 			absorbed := min(defender.CurrentShield, damage)
 			defender.CurrentShield -= absorbed
 			defender.CurrentLife = max(0, defender.CurrentLife-(damage-absorbed))
-			attacker.CurrentStamina -= cost
+			attacker.HasAttacked = true
 			alive := false
 			for _, unit := range enemy.Units {
 				if unit.CurrentLife > 0 {

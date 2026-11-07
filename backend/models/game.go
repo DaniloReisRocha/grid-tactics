@@ -35,6 +35,7 @@ type UnitInstance struct {
 	CurrentStamina int        `json:"currentStamina"`
 	CurrentShield  int        `json:"currentShield"`
 	CurrentLife    int        `json:"currentLife"`
+	HasAttacked    bool       `json:"hasAttacked"`
 	Unit           Unit       `json:"unit"`
 	Path           []Position `json:"path"`
 }

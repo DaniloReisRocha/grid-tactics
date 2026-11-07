@@ -4,7 +4,18 @@ import "github.com/DaniloReisRocha/grid-tactics/backend/models"
 
 func isBridge(cell models.Cell) bool { return cell.Object == "bridgeX" || cell.Object == "bridgeY" }
 func walkable(cell models.Cell) bool {
-	return isBridge(cell) || (cell.Terrain != "water" && cell.Object == "")
+	if isBridge(cell) {
+		return true
+	}
+	if cell.Terrain == "water" {
+		return false
+	}
+	switch cell.Object {
+	case "", "tree", "forest", "rock", "rockDirt":
+		return true
+	default:
+		return false
+	}
 }
 
 // Moving laterally or downhill costs 1. Only climbing adds up to 2 stamina.

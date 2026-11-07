@@ -127,8 +127,17 @@ func TestAttackShieldLifeVictoryAndFriendlyFire(t *testing.T) {
 		t.Fatal(err)
 	}
 	defender := s.Players[b].Units[0]
-	if defender.CurrentShield != 0 || defender.CurrentLife != 2 || s.Players[a].Units[0].CurrentStamina != 4 {
+	if defender.CurrentShield != 0 || defender.CurrentLife != 2 || s.Players[a].Units[0].CurrentStamina != 6 {
 		t.Fatal("incorrect combat accounting")
+	}
+	if err := s.Attack(a, "a", models.Position{X: 1}); err == nil {
+		t.Fatal("accepted two attacks by the same unit in one turn")
+	}
+	if err := s.EndTurn(a); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.EndTurn(b); err != nil {
+		t.Fatal(err)
 	}
 	if err := s.Attack(a, "a", models.Position{X: 1}); err != nil {
 		t.Fatal(err)

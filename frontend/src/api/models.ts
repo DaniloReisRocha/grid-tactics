@@ -14,6 +14,7 @@ export type UnitInstance = Position & {
   player: number; ownerID: string;
   path?: Position[];
   currentStamina: number; currentShield: number; currentLife: number; unit: Unit;
+  hasAttacked: boolean;
 };
 export type Player = { name: string; accoID: string; connected: boolean; units: UnitInstance[] };
 export type GameStatus = "waiting" | "playing" | "paused" | "finished";

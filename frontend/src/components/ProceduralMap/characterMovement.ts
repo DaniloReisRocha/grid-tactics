@@ -1,9 +1,10 @@
 import { hasBridge, type MapTile } from "./generator";
 
 export const tileKey = (x: number, y: number) => `${x},${y}`;
+const PASSABLE_DECORATIONS = new Set<MapTile["object"]>(["tree", "forest", "rock", "rockDirt"]);
 
 export function isWalkable(tile: MapTile) {
-  return hasBridge(tile) || (tile.terrain !== "water" && !tile.object);
+  return hasBridge(tile) || (tile.terrain !== "water" && (!tile.object || PASSABLE_DECORATIONS.has(tile.object)));
 }
 
 export function movementCost(from: Pick<MapTile, "height">, to: Pick<MapTile, "height">) {

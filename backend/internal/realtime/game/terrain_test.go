@@ -51,7 +51,39 @@ func TestTerrainTraversalAndSpawn(t *testing.T) {
 	}
 	cliff.Height = 1
 	cliff.Object = "forest"
-	if CanTraverse(grass, cliff) {
-		t.Fatal("forest accepted")
+	if !CanTraverse(grass, cliff) {
+		t.Fatal("forest should be traversable")
+	}
+}
+
+func TestDecorationsArePassableButBuildingsAndWaterStillBlock(t *testing.T) {
+	from := models.Cell{X: 0, Y: 0, Terrain: "grass"}
+	for _, object := range []string{"tree", "forest", "rock", "rockDirt"} {
+		to := models.Cell{X: 1, Y: 0, Terrain: "grass", Object: object}
+		if !CanTraverse(from, to) || !CanTraverse(to, from) {
+			t.Errorf("cannot enter/leave %s", object)
+		}
+		to.Terrain = "water"
+		if CanTraverse(from, to) {
+			t.Errorf("decoration %s made water traversable", object)
+		}
+	}
+	for _, object := range []string{"house", "ruin", "unknown"} {
+		if CanTraverse(from, models.Cell{X: 1, Y: 0, Terrain: "grass", Object: object}) {
+			t.Errorf("blocking structure %s became passable", object)
+		}
+	}
+	s, a, b := startedSession(t)
+	s.Board = nil
+	for x, object := range []string{"", "tree", "forest", "rock", "rockDirt", "", ""} {
+		s.Board = append(s.Board, models.Cell{X: x, Y: 0, Terrain: "grass", Object: object})
+	}
+	s.Players[a].Units[0].Position = models.Position{}
+	s.Players[b].Units[0].Position = models.Position{X: 6}
+	if err := s.MovePiece(a, "a", models.Position{X: 5}); err != nil {
+		t.Fatal(err)
+	}
+	if unit := s.Players[a].Units[0]; unit.X != 5 || unit.CurrentStamina != 1 {
+		t.Fatal("crossing decorations did not use normal movement cost")
 	}
 }

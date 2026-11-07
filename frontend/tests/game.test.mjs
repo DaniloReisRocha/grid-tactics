@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import ts from "typescript";
 import path from "node:path";
+import { createRequire } from "node:module";
 
 function compile(file, globals = {}) {
   const source = readFileSync(new URL(`../src/${file}`, import.meta.url), "utf8")
@@ -38,7 +39,7 @@ test("movement prefers cheap terrain and respects stamina, occupied corners and 
   assert.equal(blocked.costs.get("1,0"), 2); // Must walk around the occupied corner.
 });
 
-test("multiplayer terrain blocks forests and water; bridges enforce orientation", () => {
+test("trees and rocks are passable; buildings, water and bridge orientation still block", () => {
   const { movementOptions } = compile("internal/game/pathfinding.ts");
   const unit = { x: 0, y: 0, currentStamina: 20, currentLife: 3, unit: { id: "a" } };
   const board = [0, 1, 2].map((x) => ({ x, y: 0, terrain: "grass", height: 0, elevation: 0 }));
@@ -49,8 +50,19 @@ test("multiplayer terrain blocks forests and water; bridges enforce orientation"
   board[1].object = "bridgeY";
   assert.equal(movementOptions(board, unit, [unit]).paths.has("2,0"), false);
   board[1].terrain = "grass";
-  board[1].object = "forest";
-  assert.equal(movementOptions(board, unit, [unit]).paths.has("2,0"), false);
+  for (const object of ["tree", "forest", "rock", "rockDirt"]) {
+    board[1].object = object;
+    assert.equal(movementOptions(board, unit, [unit]).costs.get("2,0"), 2, object);
+    const inside = { ...unit, x:1 };
+    assert.equal(movementOptions(board, inside, [inside]).costs.get("2,0"), 1, `leaving ${object}`);
+    board[1].terrain = "water";
+    assert.equal(movementOptions(board, unit, [unit]).paths.has("2,0"), false, `water with ${object}`);
+    board[1].terrain = "grass";
+  }
+  for (const object of ["house", "ruin"]) {
+    board[1].object = object;
+    assert.equal(movementOptions(board, unit, [unit]).paths.has("2,0"), false, object);
+  }
   delete board[1].object; board[1].height = 2;
   assert.equal(movementOptions(board, unit, [unit]).costs.get("2,0"), 4);
 });
@@ -73,6 +85,59 @@ test("stamina charges uphill differences only, caps the bonus at 2 and previews 
   assert.equal(movementOptions(board,{...unit,currentStamina:5},[unit]).paths.has("3,0"),false);
   const elevated = { ...unit, x:3, currentStamina:2 };
   assert.equal(movementOptions(board,elevated,[elevated]).costs.get("5,0"),2);
+});
+
+test("attack availability and targets ignore stamina and staminaPenalty, but enforce one attack per unit", () => {
+  const { canUnitAttack, isAttackTarget } = compile("internal/game/combat.ts");
+  const attacker = {
+    x:0,y:0,ownerID:"a",currentLife:3,currentStamina:0,hasAttacked:false,
+    unit:{id:"a1",stamina:4,weapons:[{range:2,staminaPenalty:999}]},
+  };
+  const target = { ...attacker,x:1,ownerID:"b",unit:{...attacker.unit,id:"b1"} };
+  assert.equal(canUnitAttack(attacker),true);
+  assert.equal(isAttackTarget(attacker,target),true);
+  assert.equal(isAttackTarget(attacker,undefined),false);
+  assert.equal(isAttackTarget(attacker,{...target,x:3}),false);
+  assert.equal(isAttackTarget(attacker,{...target,ownerID:"a"}),false);
+  assert.equal(isAttackTarget(attacker,{...target,currentLife:0}),false);
+  assert.equal(canUnitAttack({...attacker,hasAttacked:true}),false);
+  assert.equal(isAttackTarget({...attacker,hasAttacked:true},target),false);
+  assert.equal(canUnitAttack({...attacker,currentLife:0}),false);
+  assert.equal(canUnitAttack({...attacker,unit:{...attacker.unit,weapons:[]}}),false);
+  const other = {...attacker,unit:{...attacker.unit,id:"a2"}};
+  assert.equal(canUnitAttack(other),true);
+});
+
+test("empty slots do not send attacks, consume allowance or exit attack mode", () => {
+  const sent = [];
+  const require = createRequire(import.meta.url);
+  const socket = {
+    subscribe() {}, onStatus() {},
+    sendAction(type, payload) { sent.push({type,payload}); return true; },
+  };
+  const { gameStore } = compile("store/GameSocket.ts", { require: (specifier) => {
+    if (specifier === "zustand") return require("zustand");
+    if (specifier === "@/api/webSocket/GameSocket") return {GameSocket:socket,MessageType:{attackPiece:"attackPiece"}};
+    if (specifier === "@/internal/game/combat") return compile("internal/game/combat.ts");
+    throw new Error(`Unexpected import ${specifier}`);
+  }});
+  const attacker = { x:0,y:0,ownerID:"a",currentLife:3,currentStamina:0,hasAttacked:false,
+    unit:{id:"a1",weapons:[{range:2}]} };
+  const enemy = { ...attacker,x:1,ownerID:"b",unit:{...attacker.unit,id:"b1"} };
+  const corpse = { ...enemy,x:2,currentLife:0,unit:{...enemy.unit,id:"b2"} };
+  gameStore.setState({ accountID:"a",currentTurn:"a",status:"playing",unitID:"a1",attackMode:true,
+    pending:false,players:{a:{units:[attacker]},b:{units:[enemy,corpse]}} });
+  for (const [x,y] of [[0,1],[2,1],[2,0],[0,1]]) {
+    gameStore.getState().attackPiece("a1",x,y);
+    assert.equal(sent.length,0);
+    assert.equal(gameStore.getState().pending,false);
+    assert.equal(gameStore.getState().attackMode,true);
+    assert.equal(attacker.hasAttacked,false);
+  }
+  gameStore.getState().attackPiece("a1",1,0);
+  assert.equal(sent.length,1);
+  assert.equal(sent[0].type,"attackPiece");
+  assert.equal(gameStore.getState().pending,true);
 });
 
 test("each player has a distinct stable character model from the three sheet blocks", () => {

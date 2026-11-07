@@ -5,6 +5,7 @@ import type { MapActor } from "@/components/ProceduralMap/types";
 import { useGameSocket } from "@/store/GameSocket";
 import { movementOptions, positionKey } from "@/internal/game/pathfinding";
 import { playerAppearance } from "@/internal/game/appearance";
+import { canUnitAttack, isAttackTarget } from "@/internal/game/combat";
 
 export const Board = () => {
   const { id, board, players, turnOrder, unitID, setUnit, movePiece, attackPiece, attackMode,
@@ -17,11 +18,10 @@ export const Board = () => {
     && currentTurn === accountID && status === "playing" && connection === "connected" && !pending);
   const options = useMemo(() => selected && canAct ? movementOptions(board, selected, units) : null, [board, selected, units, canAct]);
   const living = useMemo(() => new Map(units.filter((unit) => unit.currentLife > 0).map((unit) => [positionKey(unit), unit])), [units]);
-  const weapon = selected?.unit.weapons[0];
   const attackTargets = new Set<string>();
-  if (canAct && attackMode && selected && weapon && selected.currentStamina >= Math.max(1, weapon.staminaPenalty)) {
+  if (canAct && attackMode && selected && canUnitAttack(selected)) {
     for (const unit of living.values()) {
-      if (unit.ownerID !== accountID && Math.max(Math.abs(unit.x - selected.x), Math.abs(unit.y - selected.y)) <= weapon.range) {
+      if (isAttackTarget(selected, unit)) {
         attackTargets.add(positionKey(unit));
       }
     }
@@ -54,9 +54,13 @@ export const Board = () => {
         onSelect: (tile) => {
           const key = positionKey(tile);
           const unit = living.get(key);
-          if (attackMode && attackTargets.has(key) && selected) {
-            attackPiece(selected.unit.id, tile.x, tile.y);
-          } else if (unit) {
+          if (attackMode) {
+            if (unit && attackTargets.has(key) && selected) {
+              attackPiece(selected.unit.id, tile.x, tile.y);
+            }
+            return;
+          }
+          if (unit) {
             setUnit(unit.unit.id);
           } else if (canAct && !attackMode && options?.paths.has(key) && selected) {
             movePiece(selected.unit.id, tile.x, tile.y);
