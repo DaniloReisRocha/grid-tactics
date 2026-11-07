@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+
 	"github.com/DaniloReisRocha/grid-tactics/backend/models"
 	"github.com/gofrs/uuid"
 	"github.com/jmoiron/sqlx"
@@ -17,8 +18,15 @@ func (g *GameUnitsGetService) Run(accoID uuid.UUID) ([]models.Unit, error) {
 		units[i] = models.Unit{
 			ID:   fmt.Sprintf("%s-%d", accoID.String(), i+1),
 			Icon: icon, LP: 3, Shield: 3, Stamina: 4,
-			Weapons: []models.Weapon{{Name: "Pistola", Icon: "🔫", Damage: 4, Range: 2, StaminaPenalty: 2, Description: "Arma inicial"}},
-			Tools:   []string{},
+			Weapons: []models.Weapon{{
+				Name:           "Pistola",
+				Icon:           "🔫",
+				Damage:         1,
+				Range:          2,
+				StaminaPenalty: 2,
+				Description:    "Arma inicial",
+			}},
+			Tools: []string{},
 		}
 	}
 	return units, nil

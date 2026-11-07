@@ -22,6 +22,7 @@ type PlayerState struct {
 type GameSession struct {
 	ID             string
 	maximumPlayers int
+	spawnSlots     []models.Position
 	Players        map[uuid.UUID]*PlayerState
 	Board          []models.Cell
 	TurnOrder      []uuid.UUID
@@ -38,7 +39,7 @@ type GameSession struct {
 func NewGameSession(id string, maximumPlayers int) *GameSession {
 	return &GameSession{
 		ID: id, maximumPlayers: maximumPlayers, Players: make(map[uuid.UUID]*PlayerState),
-		Board: generateBoard(id, 0.3), TurnOrder: []uuid.UUID{}, Status: "waiting",
+		Board: generateBoard(id, 15, 15), TurnOrder: []uuid.UUID{}, Status: "waiting",
 		StartedAt: time.Now(), LastAction: time.Now(), lock: &sync.RWMutex{},
 	}
 }
@@ -105,17 +106,19 @@ func (s *GameSession) AddPlayer(conn *realtime.WSConnection, id uuid.UUID, units
 	if len(units) == 0 {
 		return errors.New("conta sem unidades")
 	}
+	if err := s.prepareSpawns(len(units)); err != nil {
+		return err
+	}
 	occupied := s.occupied()
 	roster := make([]models.UnitInstance, 0, len(units))
-	r := rand.New(rand.NewSource(hashSid(s.ID + id.String())))
+	r := rand.New(rand.NewSource(int64(seedHash(s.ID + id.String()))))
 	for _, unit := range units {
 		found := false
-		for _, index := range r.Perm(len(s.Board)) {
-			cell := s.Board[index]
-			if occupied[models.Position{X: cell.X, Y: cell.Y}] {
+		for _, index := range r.Perm(len(s.spawnSlots)) {
+			position := s.spawnSlots[index]
+			if occupied[position] {
 				continue
 			}
-			position := models.Position{X: cell.X, Y: cell.Y}
 			occupied[position] = true
 			roster = append(roster, models.UnitInstance{
 				Position: position, Player: len(s.TurnOrder) + 1, OwnerID: id, Unit: unit,

@@ -16,6 +16,11 @@ type Cell struct {
 	X         int            `json:"x"`
 	Y         int            `json:"y"`
 	Elevation ElevationLevel `json:"elevation"`
+	Terrain   string         `json:"terrain"`
+	Height    int            `json:"height"`
+	Object    string         `json:"object,omitempty"`
+	Roof      string         `json:"roof,omitempty"`
+	Waterfall bool           `json:"waterfall,omitempty"`
 }
 
 type Position struct {
@@ -25,12 +30,13 @@ type Position struct {
 
 type UnitInstance struct {
 	Position
-	Player         int       `json:"player"`
-	OwnerID        uuid.UUID `json:"ownerID"`
-	CurrentStamina int       `json:"currentStamina"`
-	CurrentShield  int       `json:"currentShield"`
-	CurrentLife    int       `json:"currentLife"`
-	Unit           Unit      `json:"unit"`
+	Player         int        `json:"player"`
+	OwnerID        uuid.UUID  `json:"ownerID"`
+	CurrentStamina int        `json:"currentStamina"`
+	CurrentShield  int        `json:"currentShield"`
+	CurrentLife    int        `json:"currentLife"`
+	Unit           Unit       `json:"unit"`
+	Path           []Position `json:"path"`
 }
 
 type Weapon struct {

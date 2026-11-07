@@ -88,11 +88,22 @@ func TestTwoClientsMoveTurnReconnectReplaceAndLeave(t *testing.T) {
 	}
 	var target models.Position
 	found := false
-	for _, delta := range []models.Position{{X: 1}, {X: -1}, {Y: 1}, {Y: -1}} {
-		next := models.Position{X: unit.X + delta.X, Y: unit.Y + delta.Y}
-		if next.X >= 0 && next.X < 10 && next.Y >= 0 && next.Y < 10 && !used[next] {
-			target = next
-			found = true
+	cells := map[models.Position]models.Cell{}
+	for _, cell := range state.Board {
+		cells[models.Position{X: cell.X, Y: cell.Y}] = cell
+	}
+	for _, candidate := range state.Players[a].Units {
+		unit = candidate
+		for _, delta := range []models.Position{{X: 1}, {X: -1}, {Y: 1}, {Y: -1}} {
+			next := models.Position{X: unit.X + delta.X, Y: unit.Y + delta.Y}
+			cell, exists := cells[next]
+			if exists && game.CanTraverse(cells[unit.Position], cell) && !used[next] {
+				target = next
+				found = true
+				break
+			}
+		}
+		if found {
 			break
 		}
 	}
@@ -102,7 +113,16 @@ func TestTwoClientsMoveTurnReconnectReplaceAndLeave(t *testing.T) {
 	sendAction(t, one, movePiece, movePieceAction{UnitID: unit.Unit.ID, To: target})
 	state = readState(t, one, "playing")
 	other := readState(t, two, "playing")
-	if state.Players[a].Units[0].Position != target || other.Revision != state.Revision {
+	findUnit := func(state models.GameStatePayload) models.UnitInstance {
+		for _, candidate := range state.Players[a].Units {
+			if candidate.Unit.ID == unit.Unit.ID {
+				return candidate
+			}
+		}
+		t.Fatal("unit missing")
+		return models.UnitInstance{}
+	}
+	if findUnit(state).Position != target || other.Revision != state.Revision || len(findUnit(state).Path) < 2 {
 		t.Fatal("movement not synchronized")
 	}
 	sendAction(t, one, endTurn, struct{}{})
@@ -130,7 +150,7 @@ func TestTwoClientsMoveTurnReconnectReplaceAndLeave(t *testing.T) {
 	join(two, b)
 	state = readState(t, one, "playing")
 	readState(t, two, "playing")
-	if state.TurnCounter != 2 || state.Players[a].Units[0].Position != target {
+	if state.TurnCounter != 2 || findUnit(state).Position != target {
 		t.Fatal("reconnect reset match")
 	}
 	replacement := dial()

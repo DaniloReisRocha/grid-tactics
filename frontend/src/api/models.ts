@@ -1,5 +1,7 @@
 export type Position = { x: number; y: number };
-export type Cell = Position & { elevation: 0 | 1 | 2 };
+import type { MapTile } from "@/components/ProceduralMap/generator";
+
+export type Cell = MapTile;
 export type Weapon = {
   name: string; icon: string; damage: number; range: number;
   lifePenalty?: number; staminaPenalty: number; toolPenalty: number; description: string;
@@ -10,6 +12,7 @@ export type Unit = {
 };
 export type UnitInstance = Position & {
   player: number; ownerID: string;
+  path?: Position[];
   currentStamina: number; currentShield: number; currentLife: number; unit: Unit;
 };
 export type Player = { name: string; accoID: string; connected: boolean; units: UnitInstance[] };

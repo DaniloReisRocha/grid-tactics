@@ -3,17 +3,19 @@ import { useTick } from "@pixi/react";
 import { Assets, Rectangle, Sprite, Texture } from "pixi.js";
 import sheetUrl from "@/assets/Small-8-Direction-Characters_by_AxulArt/Small-8-Direction-Characters_by_AxulArt.png";
 import { LEVEL_HEIGHT, TILE_HEIGHT, TILE_WIDTH, hasBridge, type MapTile } from "./generator";
+import type { CharacterModel } from "./types";
 
 interface CharacterProps {
   spawn: MapTile;
   path: readonly MapTile[];
-  onMove: (tile: MapTile) => void;
   onError: () => void;
+  model?: CharacterModel;
+  onSelect?: () => void;
+  onHover?: (hovered: boolean) => void;
 }
 
 const FRAME_WIDTH = 16;
 const FRAME_HEIGHT = 24;
-const BOY_BLOCK_Y = 192;
 const STEP_MS = 180;
 
 function project(tile: MapTile) {
@@ -25,10 +27,10 @@ function project(tile: MapTile) {
   };
 }
 
-export default function Character({ spawn, path, onMove, onError }: CharacterProps) {
+export default function Character({ spawn, path, onError, model = 2, onSelect, onHover }: CharacterProps) {
   const spriteRef = useRef<Sprite>(null);
   const motion = useRef({ from: spawn, to: spawn, elapsed: STEP_MS, direction: 4, clock: 0 });
-  const command = useRef<readonly MapTile[] | null>(null);
+  const command = useRef<readonly MapTile[]>(path);
   const pending = useRef<MapTile[]>([]);
   const [frames, setFrames] = useState<Texture[][] | null>(null);
 
@@ -42,7 +44,7 @@ export default function Character({ spawn, path, onMove, onError }: CharacterPro
         Array.from({ length: 3 }, (_, pose) => new Texture({
           source: sheet.source,
           // The first 24px row of each block contains arrows, not character art.
-          frame: new Rectangle(direction * FRAME_WIDTH, BOY_BLOCK_Y + (pose + 1) * FRAME_HEIGHT, FRAME_WIDTH, FRAME_HEIGHT),
+          frame: new Rectangle(direction * FRAME_WIDTH, model * 96 + (pose + 1) * FRAME_HEIGHT, FRAME_WIDTH, FRAME_HEIGHT),
         })),
       );
       setFrames(ownedFrames);
@@ -51,7 +53,7 @@ export default function Character({ spawn, path, onMove, onError }: CharacterPro
       active = false;
       for (const direction of ownedFrames) for (const texture of direction) texture.destroy(false);
     };
-  }, [onError]);
+  }, [onError, model]);
 
   useTick((ticker) => {
     const sprite = spriteRef.current;
@@ -61,7 +63,15 @@ export default function Character({ spawn, path, onMove, onError }: CharacterPro
     if (command.current !== path) {
       command.current = path;
       // A new click replaces future steps; finish the tile transition in progress.
-      pending.current = path.slice(1);
+      const source = path[0];
+      if (!source || (source.x === state.to.x && source.y === state.to.y)) {
+        pending.current = path.slice(1);
+      } else {
+        // Several server-confirmed moves can arrive before the previous animation ends.
+        const anchor = pending.current.findIndex((tile) => tile.x === source.x && tile.y === source.y);
+        if (anchor >= 0) pending.current = [...pending.current.slice(0, anchor + 1), ...path.slice(1)];
+        else { state.from = source; state.to = source; state.elapsed = STEP_MS; pending.current = path.slice(1); }
+      }
     }
     state.clock += delta;
     state.elapsed = Math.min(STEP_MS, state.elapsed + delta);
@@ -77,7 +87,6 @@ export default function Character({ spawn, path, onMove, onError }: CharacterPro
         state.from = state.to;
         state.to = next;
         state.elapsed = 0;
-        onMove(next);
       }
     }
     const progress = state.elapsed / STEP_MS;
@@ -100,7 +109,11 @@ export default function Character({ spawn, path, onMove, onError }: CharacterPro
       anchor={{ x: 0.5, y: 0.875 }}
       scale={2}
       roundPixels
-      eventMode="none"
+      eventMode={onSelect ? "static" : "none"}
+      cursor={onSelect ? "pointer" : "default"}
+      onPointerTap={onSelect}
+      onPointerOver={() => onHover?.(true)}
+      onPointerOut={() => onHover?.(false)}
     />
   ) : null;
 }

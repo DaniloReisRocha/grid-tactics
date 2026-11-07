@@ -24,29 +24,33 @@ func startedSession(t *testing.T) (*GameSession, uuid.UUID, uuid.UUID) {
 	if err := s.AddPlayer(nil, b, []models.Unit{testUnit("b")}); err != nil {
 		t.Fatal(err)
 	}
+	s.Board = []models.Cell{}
+	for y := 0; y < 10; y++ {
+		for x := 0; x < 10; x++ {
+			s.Board = append(s.Board, models.Cell{X: x, Y: y, Terrain: "grass"})
+		}
+	}
 	return s, a, b
 }
 
-func TestBoardDeterministicAndElevationBudget(t *testing.T) {
+func TestBoardDeterministicAndWaterBudget(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		id := string(rune('a' + i))
-		board := generateBoard(id, 0.3)
-		if !reflect.DeepEqual(board, generateBoard(id, 0.3)) {
-			t.Fatal("non-deterministic board")
+		board := generateBoard(id, 15, 15)
+		if len(board) != 225 || !reflect.DeepEqual(board, generateBoard(id, 15, 15)) {
+			t.Fatal("invalid/non-deterministic board")
 		}
-		count := 0
+		water := 0
 		for _, cell := range board {
-			if cell.Elevation != 0 {
-				count++
+			if cell.Terrain == "water" && !isBridge(cell) {
+				water++
 			}
 		}
-		if count != 30 {
-			t.Fatalf("expected 30 elevated cells; got %d", count)
+		if water > 45 {
+			t.Fatalf("water limit exceeded: %d", water)
 		}
-	}
-	for _, cell := range generateBoard("flat", 0) {
-		if cell.Elevation != 0 {
-			t.Fatal("zero elevation budget not respected")
+		if len(largestRegion(board)) < 6 {
+			t.Fatal("no connected area for both teams")
 		}
 	}
 }
@@ -149,5 +153,31 @@ func TestRejoinFullSessionKeepsRoster(t *testing.T) {
 	}
 	if err := s.AddPlayer(nil, uuid.Must(uuid.NewV4()), []models.Unit{testUnit("third")}); err == nil {
 		t.Fatal("third player accepted")
+	}
+}
+
+func TestTeamsSpawnOnConnectedWalkableTerrain(t *testing.T) {
+	for i := 0; i < 30; i++ {
+		s := NewGameSession(string(rune('a'+i)), 2)
+		a, b := uuid.Must(uuid.NewV4()), uuid.Must(uuid.NewV4())
+		for _, id := range []uuid.UUID{a, b} {
+			roster := []models.Unit{testUnit(id.String() + "1"), testUnit(id.String() + "2"), testUnit(id.String() + "3")}
+			if err := s.AddPlayer(nil, id, roster); err != nil {
+				t.Fatal(err)
+			}
+		}
+		positions := map[models.Position]bool{}
+		origin := s.Players[a].Units[0].Position
+		for _, player := range s.Players {
+			for _, unit := range player.Units {
+				if positions[unit.Position] {
+					t.Fatal("overlapping spawn")
+				}
+				positions[unit.Position] = true
+				if findPath(s.Board, origin, unit.Position, nil) == nil {
+					t.Fatal("unit spawned outside connected walkable region")
+				}
+			}
+		}
 	}
 }

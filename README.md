@@ -29,7 +29,7 @@ O frontend usa `ws://<hostname>:8080/api/game-connect` em HTTP e `wss://` em HTT
 2. Informe o nome da sessão e entre.
 3. Em outra aba, gere outra conta e entre na mesma sessão.
 4. No seu turno, selecione uma unidade. O hover mostra a rota e o clique envia o destino ao servidor.
-5. Cada passo custa `1 + elevação` de stamina. Unidades vivas bloqueiam o caminho; diagonais não atravessam cantos ocupados.
+5. Cada passo custa `1 + elevação` de stamina. Unidades vivas, árvores, rochas e estruturas bloqueiam o caminho. Água só pode ser atravessada por pontes, no sentido da ponte; diagonais não cortam obstáculos e desníveis maiores que um cubo não são transitáveis.
 6. Para atacar, selecione uma unidade sua, clique em **Atacar** e escolha um inimigo em alcance. A pistola causa 4 de dano, tem alcance 2 e custa 2 de stamina. Escudo absorve dano antes da vida.
 7. Finalizar o turno passa a vez e recupera a stamina das unidades vivas do próximo jogador.
 
@@ -47,7 +47,11 @@ Contas por UUID são identificadores de teste, não autenticação. O WebSocket 
 - `backend/internal/realtime/ws.go`: transporte e fila de envio.
 - `backend/internal/realtime/game/`: sessão, geração do tabuleiro, movimento, combate e turnos em arquivos separados.
 
-`/example` continua sendo a demonstração local do mapa isométrico procedural, com seus terrenos, personagens e minimapa. O multiplayer usa o tabuleiro tático 10 × 10 do servidor; os dois modos ainda não compartilham o mapa.
+O multiplayer usa o mapa isométrico procedural de 15 × 15 tiles, gerado pelo servidor. Os tiles completos são enviados aos dois clientes; seleção, hover de caminhos, pontes, relevo e estruturas seguem as regras do servidor. As unidades aparecem no cenário e no minimapa. Cada jogador recebe um modelo diferente entre os três blocos do spritesheet AxulArt (modelo branco, menina e menino), com atribuição estável por sessão. A caminhada anima somente a rota confirmada pelo servidor.
+
+O spawn reserva espaço para os dois times de uma vez. Todas as unidades começam a pelo menos 5 blocos umas das outras, contando as diagonais. Cada posição fica em solo livre, com pelo menos duas saídas transitáveis para uma área conectada do mapa. Se o cenário inicial não comportar essas regras, o servidor tenta variações determinísticas da seed antes de aceitar o primeiro jogador; nunca posiciona unidades em locais inválidos para completar o time.
+
+O componente compartilhado `ProceduralMap` recebe as dimensões, os tiles e as unidades da partida. A geração do cenário e a escolha dos spawns pertencem ao backend.
 
 ## Verificações
 

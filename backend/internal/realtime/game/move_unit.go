@@ -32,6 +32,7 @@ func (s *GameSession) MovePiece(id uuid.UUID, unitID string, to models.Position)
 		if cost > unit.CurrentStamina {
 			return errors.New("stamina insuficiente")
 		}
+		unit.Path = append([]models.Position{unit.Position}, path...)
 		unit.Position = to
 		unit.CurrentStamina -= cost
 		s.changed()
@@ -46,10 +47,10 @@ func findPath(board []models.Cell, from, to models.Position, blocked map[models.
 	for _, cell := range board {
 		cells[models.Position{X: cell.X, Y: cell.Y}] = cell
 	}
-	if _, ok := cells[from]; !ok {
+	if cell, ok := cells[from]; !ok || !walkable(cell) {
 		return nil
 	}
-	if _, ok := cells[to]; !ok || blocked[to] {
+	if cell, ok := cells[to]; !ok || !walkable(cell) || blocked[to] {
 		return nil
 	}
 	type node struct {
@@ -80,16 +81,16 @@ func findPath(board []models.Cell, from, to models.Position, blocked map[models.
 		for _, direction := range directions {
 			next := models.Position{X: current.position.X + direction.X, Y: current.position.Y + direction.Y}
 			cell, exists := cells[next]
-			if !exists || blocked[next] {
+			if !exists || blocked[next] || !CanTraverse(cells[current.position], cell) {
 				continue
 			}
 			if direction.X != 0 && direction.Y != 0 {
 				sideX := models.Position{X: next.X, Y: current.position.Y}
 				sideY := models.Position{X: current.position.X, Y: next.Y}
-				if _, ok := cells[sideX]; !ok {
+				if side, ok := cells[sideX]; !ok || !CanTraverse(cells[current.position], side) {
 					continue
 				}
-				if _, ok := cells[sideY]; !ok {
+				if side, ok := cells[sideY]; !ok || !CanTraverse(cells[current.position], side) {
 					continue
 				}
 				if blocked[sideX] || blocked[sideY] {

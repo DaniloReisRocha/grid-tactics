@@ -3,11 +3,16 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import ts from "typescript";
+import path from "node:path";
 
 function compile(file, globals = {}) {
   const source = readFileSync(new URL(`../src/${file}`, import.meta.url), "utf8")
     .replaceAll("import.meta.env.VITE_WS_URL", "undefined");
-  const context = { exports: {}, ...globals };
+  const context = { exports: {}, require: (specifier) => {
+    const target = specifier.startsWith("@/") ? specifier.slice(2)
+      : path.posix.join(path.posix.dirname(file), specifier);
+    return compile(target.endsWith(".ts") ? target : `${target}.ts`);
+  }, ...globals };
   vm.createContext(context);
   vm.runInContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, context);
   return context.exports;
@@ -17,7 +22,7 @@ test("movement prefers cheap terrain and respects stamina, occupied corners and 
   const { movementOptions } = compile("internal/game/pathfinding.ts");
   const board = [];
   for (let y = 0; y < 3; y++) for (let x = 0; x < 5; x++) {
-    board.push({ x, y, elevation: y === 1 && x > 0 && x < 4 ? 2 : 0 });
+    board.push({ x, y, terrain: "grass", height: 0, elevation: y === 1 && x > 0 && x < 4 ? 2 : 0 });
   }
   const unit = { x: 0, y: 1, currentStamina: 4, currentLife: 3, unit: { id: "a" } };
   const options = movementOptions(board, unit, [unit]);
@@ -30,6 +35,35 @@ test("movement prefers cheap terrain and respects stamina, occupied corners and 
   const blocked = movementOptions(board, unit, [unit, blocker]);
   assert.equal(blocked.paths.has("1,1"), false);
   assert.equal(blocked.costs.get("1,0"), 2); // Must walk around the occupied corner.
+});
+
+test("multiplayer terrain blocks forests, cliffs and water; bridges enforce orientation", () => {
+  const { movementOptions } = compile("internal/game/pathfinding.ts");
+  const unit = { x: 0, y: 0, currentStamina: 20, currentLife: 3, unit: { id: "a" } };
+  const board = [0, 1, 2].map((x) => ({ x, y: 0, terrain: "grass", height: 0, elevation: 0 }));
+  board[1].terrain = "water";
+  assert.equal(movementOptions(board, unit, [unit]).paths.has("2,0"), false);
+  board[1].object = "bridgeX";
+  assert.equal(movementOptions(board, unit, [unit]).paths.has("2,0"), true);
+  board[1].object = "bridgeY";
+  assert.equal(movementOptions(board, unit, [unit]).paths.has("2,0"), false);
+  board[1].terrain = "grass";
+  board[1].object = "forest";
+  assert.equal(movementOptions(board, unit, [unit]).paths.has("2,0"), false);
+  delete board[1].object; board[1].height = 2;
+  assert.equal(movementOptions(board, unit, [unit]).paths.has("2,0"), false);
+});
+
+test("each player has a distinct stable character model from the three sheet blocks", () => {
+  const { playerAppearance } = compile("internal/game/appearance.ts");
+  const seen = new Set();
+  for (const seed of ["room-a", "room-b", "room-c", "grid-tactics"]) {
+    const models = [0, 1, 2].map((index) => playerAppearance(seed, index).model);
+    assert.equal(new Set(models).size, 3);
+    for (const model of models) { assert.ok(model >= 0 && model <= 2); seen.add(model); }
+    assert.equal(playerAppearance(seed, 0).model, models[0]);
+  }
+  assert.equal(seen.size, 3);
 });
 
 function transport() {

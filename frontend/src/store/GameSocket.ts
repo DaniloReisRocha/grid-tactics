@@ -59,6 +59,7 @@ GameSocket.subscribe((message) => {
       .find((unit) => unit.unit.id === state.unitID && unit.currentLife > 0);
     gameStore.setState({
       ...payload, pending: false, error: null,
+      board: JSON.stringify(payload.board) === JSON.stringify(state.board) ? state.board : payload.board,
       unitID: selected ? state.unitID : null,
       attackMode: state.attackMode && payload.currentTurn === state.accountID && payload.status === "playing",
     });

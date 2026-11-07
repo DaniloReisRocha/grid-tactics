@@ -1,4 +1,5 @@
 import type { Cell, Position, UnitInstance } from "@/api/models";
+import { getDestination } from "@/components/ProceduralMap/characterMovement";
 
 export const positionKey = ({ x, y }: Position) => `${x},${y}`;
 
@@ -18,7 +19,9 @@ export function movementOptions(board: Cell[], unit: UnitInstance, units: UnitIn
     for (const [dx, dy] of [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
       const next = { x: current.x + dx, y: current.y + dy };
       const nextKey = positionKey(next);
-      const cell = cells.get(nextKey);
+      const from = cells.get(key);
+      if (!from) continue;
+      const cell = getDestination(from, dx, dy, cells);
       if (!cell || blocked.has(nextKey)) continue;
       if (dx && dy) {
         const sideX = positionKey({ x: next.x, y: current.y });

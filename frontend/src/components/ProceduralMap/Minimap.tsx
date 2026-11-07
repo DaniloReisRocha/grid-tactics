@@ -1,18 +1,19 @@
 import type { CSSProperties } from "react";
 import { hasBridge, TERRAIN_LABELS, type Asset, type MapTile } from "./generator";
+import type { MapActor } from "./types";
 
 interface MinimapProps {
   tiles: readonly MapTile[];
   width: number;
   height: number;
-  character?: Pick<MapTile, "x" | "y">;
+  actors?: readonly MapActor[];
 }
 
 const colors = Object.fromEntries(
   TERRAIN_LABELS.map(({ terrain, color }) => [terrain, color]),
 ) as Partial<Record<Asset, string>>;
 
-export default function Minimap({ tiles, width, height, character }: MinimapProps) {
+export default function Minimap({ tiles, width, height, actors }: MinimapProps) {
   return (
     <figure style={styles.panel}>
       <figcaption style={styles.caption}>
@@ -56,14 +57,13 @@ export default function Minimap({ tiles, width, height, character }: MinimapProp
             </g>
           );
         })}
-        {character ? (
-          <circle
-            cx={character.x + 0.5} cy={character.y + 0.5} r={0.42}
-            fill="#ffdc62" stroke="#17231f" strokeWidth={0.12}
-          >
-            <title>Personagem</title>
+        {actors?.map((actor) => (
+          <circle key={actor.id} cx={actor.tile.x + 0.5} cy={actor.tile.y + 0.5}
+            r={actor.selected ? 0.48 : 0.34} fill={actor.color}
+            stroke={actor.selected ? "#ffffff" : "#17231f"} strokeWidth={0.12}>
+            <title>{actor.selected ? "Unidade selecionada" : "Unidade"}</title>
           </circle>
-        ) : null}
+        ))}
       </svg>
     </figure>
   );
