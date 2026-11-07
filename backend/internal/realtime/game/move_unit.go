@@ -1,45 +1,123 @@
 package game
 
 import (
-	"github.com/DaniloReisRocha/grid-tactics/backend/internal/utils/array"
+	"errors"
 	"github.com/DaniloReisRocha/grid-tactics/backend/models"
 	"github.com/gofrs/uuid"
-	"github.com/pkg/errors"
+	"sort"
 )
 
-func moveUnitByID(gs *GameSession, accoID uuid.UUID, unitID string, to models.Position) error {
-	player, ok := gs.Players[accoID]
-	if !ok {
-		return errors.New("player not found")
+func (s *GameSession) MovePiece(id uuid.UUID, unitID string, to models.Position) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	p, err := s.actingPlayer(id)
+	if err != nil {
+		return err
 	}
-	unitIndex, ok := array.FindIndex(player.Units, func(p models.UnitInstance) bool {
-		return p.Unit.ID == unitID
-	})
-	if !ok {
-		return errors.New("unit not found")
-	}
-	unit := player.Units[unitIndex]
-	path := findPathToTarget(gs.Board, unit.X, unit.Y, to.X, to.Y)
-	if path == nil {
-		return errors.New("invalid path")
-	}
-	totalCost := 0
-	for _, step := range path {
-		cell, ok := findCell(gs.Board, step.X, step.Y)
-		if !ok {
-			return errors.New("invalid cell in path")
+	for i := range p.Units {
+		unit := &p.Units[i]
+		if unit.Unit.ID != unitID {
+			continue
 		}
-		totalCost += 1 + int(cell.Elevation)
+		if unit.CurrentLife <= 0 {
+			return errors.New("unidade eliminada")
+		}
+		blocked := s.occupied()
+		delete(blocked, unit.Position)
+		path := findPath(s.Board, unit.Position, to, blocked)
+		if path == nil {
+			return errors.New("destino inacessível")
+		}
+		cost := pathCost(s.Board, path)
+		if cost > unit.CurrentStamina {
+			return errors.New("stamina insuficiente")
+		}
+		unit.Position = to
+		unit.CurrentStamina -= cost
+		s.changed()
+		return nil
 	}
+	return errors.New("unidade não pertence ao jogador")
+}
 
-	if totalCost > unit.CurrentStamina {
-		return errors.New("not enough stamina")
+// Dijkstra: terrain has nonuniform cost (1 + elevation); BFS is not sufficient.
+func findPath(board []models.Cell, from, to models.Position, blocked map[models.Position]bool) []models.Position {
+	cells := make(map[models.Position]models.Cell, len(board))
+	for _, cell := range board {
+		cells[models.Position{X: cell.X, Y: cell.Y}] = cell
 	}
-
-	unit.X = to.X
-	unit.Y = to.Y
-	unit.CurrentStamina -= totalCost
-	gs.Players[accoID].Units[unitIndex] = unit
-
+	if _, ok := cells[from]; !ok {
+		return nil
+	}
+	if _, ok := cells[to]; !ok || blocked[to] {
+		return nil
+	}
+	type node struct {
+		position models.Position
+		cost     int
+	}
+	open := []node{{from, 0}}
+	costs := map[models.Position]int{from: 0}
+	parents := map[models.Position]models.Position{}
+	directions := []models.Position{{X: 1}, {Y: 1}, {X: -1}, {Y: -1}, {X: 1, Y: 1}, {X: -1, Y: 1}, {X: 1, Y: -1}, {X: -1, Y: -1}}
+	for len(open) > 0 {
+		sort.SliceStable(open, func(i, j int) bool { return open[i].cost < open[j].cost })
+		current := open[0]
+		open = open[1:]
+		if current.cost != costs[current.position] {
+			continue
+		}
+		if current.position == to {
+			path := []models.Position{}
+			for step := to; step != from; step = parents[step] {
+				path = append(path, step)
+			}
+			for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
+				path[i], path[j] = path[j], path[i]
+			}
+			return path
+		}
+		for _, direction := range directions {
+			next := models.Position{X: current.position.X + direction.X, Y: current.position.Y + direction.Y}
+			cell, exists := cells[next]
+			if !exists || blocked[next] {
+				continue
+			}
+			if direction.X != 0 && direction.Y != 0 {
+				sideX := models.Position{X: next.X, Y: current.position.Y}
+				sideY := models.Position{X: current.position.X, Y: next.Y}
+				if _, ok := cells[sideX]; !ok {
+					continue
+				}
+				if _, ok := cells[sideY]; !ok {
+					continue
+				}
+				if blocked[sideX] || blocked[sideY] {
+					continue
+				}
+			}
+			cost := current.cost + 1 + int(cell.Elevation)
+			previous, seen := costs[next]
+			if seen && previous <= cost {
+				continue
+			}
+			costs[next] = cost
+			parents[next] = current.position
+			open = append(open, node{next, cost})
+		}
+	}
 	return nil
+}
+
+func pathCost(board []models.Cell, path []models.Position) int {
+	cost := 0
+	for _, position := range path {
+		for _, cell := range board {
+			if cell.X == position.X && cell.Y == position.Y {
+				cost += 1 + int(cell.Elevation)
+				break
+			}
+		}
+	}
+	return cost
 }

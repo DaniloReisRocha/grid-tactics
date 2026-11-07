@@ -31,9 +31,6 @@ export default function IsoMapPixi({ map }: Props) {
     return tex;
   }, [map]);
 
-  const rows = map.length;
-  const cols = map[0]?.length || 0;
-
   return (
     <Application width={800} height={600} background={0xc6bfa7}>
       <pixiContainer x={400} y={100}>

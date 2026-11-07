@@ -29,6 +29,36 @@ export function getDestination(from: MapTile, dx: number, dy: number, lookup: Ma
   return to;
 }
 
+/** Shortest route in tile steps, including start and destination; null if unreachable. */
+export function findPath(from: MapTile, to: MapTile, lookup: Map<string, MapTile>): MapTile[] | null {
+  if (!isWalkable(from) || !isWalkable(to)) return null;
+  const destinationKey = tileKey(to.x, to.y);
+  const originKey = tileKey(from.x, from.y);
+  const parents = new Map<string, MapTile | null>([[originKey, null]]);
+  const queue = [from];
+  for (let index = 0; index < queue.length; index += 1) {
+    const current = queue[index];
+    if (tileKey(current.x, current.y) === destinationKey) {
+      const route: MapTile[] = [];
+      let step: MapTile | null = current;
+      while (step) {
+        route.push(step);
+        step = parents.get(tileKey(step.x, step.y)) ?? null;
+      }
+      return route.reverse();
+    }
+    for (const [dx, dy] of [[1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+      const next = getDestination(current, dx, dy, lookup);
+      if (!next) continue;
+      const key = tileKey(next.x, next.y);
+      if (parents.has(key)) continue;
+      parents.set(key, current);
+      queue.push(next);
+    }
+  }
+  return null;
+}
+
 export function findSpawn(tiles: readonly MapTile[]) {
   const lookup = new Map(tiles.map((tile) => [tileKey(tile.x, tile.y), tile]));
   const visited = new Set<string>();

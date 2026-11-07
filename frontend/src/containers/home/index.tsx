@@ -1,136 +1,37 @@
-import { useState } from "react";
-import { joinGame, GameSocket, MessageType } from "@/api/webSocket/GameSocket";
-
-const pieces = [
-  {
-    icon: "🦸‍♂️",
-    id: "11",
-    lp: 3,
-    shield: 3,
-    stamina: 100,
-    weapons: ["pistol"],
-    tools: [],
-  },
-  {
-    icon: "🦸‍♀️",
-    id: "12",
-    lp: 3,
-    shield: 3,
-    stamina: 4,
-    weapons: ["pistol"],
-    tools: [],
-  },
-  {
-    icon: "🧙‍♂️",
-    id: "13",
-    lp: 3,
-    shield: 3,
-    stamina: 4,
-    weapons: ["pistol"],
-    tools: [],
-  },
-];
+import { useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 
 export const Home = () => {
-  const [formData, setFormData] = useState({
-    conta: "",
-    secao: "",
-  });
-
-  const handleChange = (e: any) => {
-    const { name, value } = e.target;
-    setFormData((prevState) => ({
-      ...prevState,
-      [name]: value,
-    }));
+  const navigate = useNavigate();
+  const [accountID, setAccountID] = useState(() => sessionStorage.getItem("grid-tactics.account") ?? "");
+  const [sessionID, setSessionID] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const account = accountID.trim().toLowerCase();
+    const session = sessionID.trim();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(account)
+      || account === "00000000-0000-0000-0000-000000000000") {
+      setError("Informe um UUID de conta válido ou gere uma conta de teste.");
+      return;
+    }
+    if (!session || session.length > 100) { setError("Informe uma sessão de até 100 caracteres."); return; }
+    sessionStorage.setItem("grid-tactics.account", account);
+    navigate(`/grid-tactics/${encodeURIComponent(session)}/${encodeURIComponent(account)}`);
   };
-
-  const handleSubmit = (e: any) => {
-    e.preventDefault();
-    console.log("Dados enviados:", formData);
-    joinGame(formData.secao, formData.conta, pieces);
-  };
-
-  const sandEcho = () => {
-    GameSocket.send(
-      JSON.stringify({
-        type: MessageType.echo,
-        payload: "Testando 123 ...",
-      })
-    );
-  };
-
   return (
-    <div>
-      <button
-        style={{
-          backgroundColor: "grey",
-          color: "white",
-          padding: "10px 15px",
-          border: "none",
-          borderRadius: "4px",
-          cursor: "pointer",
-        }}
-        onClick={sandEcho}
-      >
-        Send Echo
-      </button>
-      <div style={{ maxWidth: "400px", margin: "0 auto", padding: "20px" }}>
-        <h2>Formulário de Acesso</h2>
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: "15px" }}>
-            <label
-              htmlFor="conta"
-              style={{ display: "block", marginBottom: "5px" }}
-            >
-              Conta:
-            </label>
-            <input
-              type="text"
-              id="conta"
-              name="conta"
-              value={formData.conta}
-              onChange={handleChange}
-              style={{ width: "100%", padding: "8px", boxSizing: "border-box" }}
-              placeholder="Digite sua conta"
-              required
-            />
-          </div>
-
-          <div style={{ marginBottom: "15px" }}>
-            <label
-              htmlFor="secao"
-              style={{ display: "block", marginBottom: "5px" }}
-            >
-              Seção:
-            </label>
-            <input
-              type="text"
-              id="secao"
-              name="secao"
-              value={formData.secao}
-              onChange={handleChange}
-              style={{ width: "100%", padding: "8px", boxSizing: "border-box" }}
-              placeholder="Digite sua seção"
-              required
-            />
-          </div>
-
-          <button
-            type="submit"
-            style={{
-              backgroundColor: "#4CAF50",
-              color: "white",
-              padding: "10px 15px",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer",
-            }}
-          >
-            Entrar na Partida
-          </button>
-        </form>
-      </div>
-    </div>
+    <main style={{ maxWidth: 440, margin: "auto", padding: 24 }}>
+      <h1 style={{ fontSize: 30 }}>Grid Tactics</h1>
+      <p>Use a mesma sessão e contas diferentes para jogar em duas abas.</p>
+      <form onSubmit={submit} style={{ display: "grid", gap: 12 }}>
+        <label htmlFor="account">Conta (UUID)</label>
+        <input id="account" value={accountID} onChange={(event) => setAccountID(event.target.value)} required />
+        <button type="button" onClick={() => { setAccountID(crypto.randomUUID()); setError(null); }}>Gerar conta de teste</button>
+        <label htmlFor="session">Sessão</label>
+        <input id="session" value={sessionID} onChange={(event) => setSessionID(event.target.value)} maxLength={100} required />
+        {error ? <p role="alert">{error}</p> : null}
+        <button type="submit">Entrar na partida</button>
+      </form>
+    </main>
   );
 };

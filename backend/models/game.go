@@ -25,10 +25,12 @@ type Position struct {
 
 type UnitInstance struct {
 	Position
-	CurrentStamina int  `json:"currentStamina"`
-	CurrentShield  int  `json:"currentShield"`
-	CurrentLife    int  `json:"currentLife"`
-	Unit           Unit `json:"unit"`
+	Player         int       `json:"player"`
+	OwnerID        uuid.UUID `json:"ownerID"`
+	CurrentStamina int       `json:"currentStamina"`
+	CurrentShield  int       `json:"currentShield"`
+	CurrentLife    int       `json:"currentLife"`
+	Unit           Unit      `json:"unit"`
 }
 
 type Weapon struct {
@@ -43,8 +45,10 @@ type Weapon struct {
 }
 
 type Player struct {
-	AccoID uuid.UUID      `json:"accoID"`
-	Units  []UnitInstance `json:"units"`
+	AccoID    uuid.UUID      `json:"accoID"`
+	Name      string         `json:"name"`
+	Connected bool           `json:"connected"`
+	Units     []UnitInstance `json:"units"`
 }
 
 type GameStatePayload struct {
@@ -54,4 +58,7 @@ type GameStatePayload struct {
 	TurnOrder   []uuid.UUID           `json:"turnOrder"`
 	CurrentTurn *uuid.UUID            `json:"currentTurn"`
 	TurnCounter int                   `json:"turnCounter"`
+	Status      string                `json:"status"`
+	Winner      *uuid.UUID            `json:"winner"`
+	Revision    uint64                `json:"revision"`
 }

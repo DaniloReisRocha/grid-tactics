@@ -101,8 +101,9 @@ func (h *HTTPServer) Routes(authMiddleware *jwt.GinJWTMiddleware) []endpoint.API
 
 	gsG := service.GameUnitsGetService{DB: h.DB}
 	gsWs := service.GameWsService{
-		GetUnits: gsG.Run,
-		Logger:   log.New(os.Stderr, "PlaygroundWs: ", log.Lshortfile),
+		AllowedOrigins: h.ServerConf.AllowedOrigins,
+		GetUnits:       gsG.Run,
+		Logger:         log.New(os.Stderr, "PlaygroundWs: ", log.Lshortfile),
 	}
 	gsH := GameSocketHandler{
 		gameWs: gsWs.Receive,

@@ -10,7 +10,7 @@ type Unit struct {
 	Icon    string   `json:"icon"`
 	Shield  int      `json:"shield"`
 	Stamina int      `json:"stamina"`
-	Weapons []string `json:"weapons"`
+	Weapons []Weapon `json:"weapons"`
 	Tools   []string `json:"tools"`
 }
 

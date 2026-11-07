@@ -47,6 +47,9 @@ func makeZodClient() (string, error) {
 
 	endpoints.WriteString("const endpoints = makeApi([\n")
 	for _, ep := range handler.Routes(nil) {
+		if ep.MakeZod == nil {
+			continue
+		}
 		zodStr, err := ep.MakeZod()
 		if err != nil {
 			return "", err

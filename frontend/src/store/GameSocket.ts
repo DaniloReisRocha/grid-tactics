@@ -1,106 +1,67 @@
-import type { Cell, GameStatePayload, Player } from "@/api/models";
-import { create, useStore } from "zustand";
-import { immer } from "zustand/middleware/immer";
+import { create } from "zustand";
+import type { GameStatePayload } from "@/api/models";
+import { GameSocket, MessageType, type ConnectionStatus } from "@/api/webSocket/GameSocket";
 
-const GameSocket = new WebSocket("ws://localhost:8080/api/game-connect");
-
-const socketSend = (messageType: string, payload: any) => {
-  GameSocket.send(JSON.stringify({ type: messageType, payload: payload }));
+const emptyGame: GameStatePayload = {
+  id: "", players: {}, board: [], turnOrder: [], currentTurn: null,
+  turnCounter: 0, status: "waiting", winner: null, revision: -1,
 };
-
-const MessageType = {
-  echo: "echo",
-  joinGame: "joinGame",
-  movePiece: "movePiece",
-  actionFailed: "actionFailed",
-  gameStateUpdate: "gameStateUpdate",
-} as const;
-
-type Message = {
-  type: keyof typeof MessageType;
-  payload: any;
-};
-
-type Store = {
-  unitID?: string | null;
-  gameID: string;
-  players: Record<string, Player | undefined>;
-  board: Cell[];
-  turnOrder: string[];
-  currentTurn: string | null;
-  turnCounter: number;
-};
-
-type Actions = {
+type GameStore = GameStatePayload & {
+  accountID: string; unitID: string | null; attackMode: boolean;
+  connection: ConnectionStatus; error: string | null; pending: boolean;
   setUnit: (unitID: string) => void;
+  setAttackMode: (active: boolean) => void;
   joinGame: (sessionID: string, accoID: string) => void;
+  leaveGame: (forfeit?: boolean) => void;
   movePiece: (unitID: string, x: number, y: number) => void;
-  setGameState: (payload: GameStatePayload) => void;
-  reset: () => void;
+  attackPiece: (unitID: string, x: number, y: number) => void;
+  endTurn: () => void;
+  clearError: () => void;
 };
 
-const initialValues: Store = {
-  unitID: null,
-  gameID: "",
-  players: {},
-  board: [],
-  turnOrder: [],
-  currentTurn: null,
-  turnCounter: 0,
-};
-
-const gameStore = create<Store & Actions>()(
-  immer((set) => ({
-    ...initialValues,
-    setUnit: (unitID) =>
-      set((state) => {
-        state.unitID = unitID;
-      }),
-    setGameState: (payload) =>
-      set((state) => {
-        state.gameID = payload.id;
-        state.players = payload.players;
-        state.board = payload.board;
-        state.turnOrder = payload.turnOrder;
-        state.currentTurn = payload.currentTurn;
-        state.turnCounter = payload.turnCounter;
-      }),
-    reset: () =>
-      set((state) => {
-        state.gameID = initialValues.gameID;
-        state.players = initialValues.players;
-        state.board = initialValues.board;
-        state.turnOrder = initialValues.turnOrder;
-        state.currentTurn = initialValues.currentTurn;
-        state.turnCounter = initialValues.turnCounter;
-      }),
-    joinGame: (sessionID, accoID) => {
-      socketSend(MessageType.joinGame, {
-        sessionID,
-        accoID,
-      });
+export const gameStore = create<GameStore>((set, get) => {
+  const act = (type: string, payload: unknown = {}) => {
+    const state = get();
+    if (state.pending || state.status !== "playing" || state.currentTurn !== state.accountID) return;
+    if (!GameSocket.sendAction(type, payload)) { set({ error: "Aguarde a conexão com o servidor." }); return; }
+    set({ pending: true, error: null });
+  };
+  return {
+    ...emptyGame, accountID: "", unitID: null, attackMode: false,
+    connection: "disconnected", error: null, pending: false,
+    setUnit: (unitID) => set({ unitID, attackMode: false }),
+    setAttackMode: (attackMode) => set({ attackMode }),
+    clearError: () => set({ error: null }),
+    joinGame: (sessionID, accountID) => {
+      set({ ...emptyGame, id: sessionID, accountID, unitID: null, attackMode: false, error: null, pending: false });
+      GameSocket.connect(sessionID, accountID);
     },
-    movePiece: (unitID, x, y) => {
-      socketSend(MessageType.movePiece, {
-        unitID,
-        to: { x, y },
-      });
+    leaveGame: (forfeit = false) => {
+      if (forfeit) GameSocket.sendAction(MessageType.leaveGame);
+      GameSocket.disconnect();
+      set({ ...emptyGame, accountID: "", unitID: null, attackMode: false, error: null, pending: false });
     },
-  }))
-);
+    movePiece: (unitID, x, y) => act(MessageType.movePiece, { unitID, to: { x, y } }),
+    attackPiece: (unitID, x, y) => act(MessageType.attackPiece, { unitID, to: { x, y } }),
+    endTurn: () => act(MessageType.endTurn),
+  };
+});
 
-GameSocket.onmessage = (event) => {
-  const { type, payload }: Message = JSON.parse(event.data);
-  const { setGameState } = gameStore.getState();
-
-  switch (type) {
-    case MessageType.gameStateUpdate:
-      setGameState(payload);
-      break;
-    case MessageType.actionFailed:
-      console.error(payload.message);
-      break;
+GameSocket.onStatus((connection) => gameStore.setState({ connection, ...(connection !== "connected" ? { pending: false } : {}) }));
+GameSocket.subscribe((message) => {
+  const state = gameStore.getState();
+  if (message.type === "actionFailed") {
+    gameStore.setState({ error: message.payload.message, pending: false });
+  } else if (message.type === "gameStateUpdate") {
+    const payload = message.payload;
+    if (payload.id !== state.id || payload.revision < state.revision) return;
+    const selected = Object.values(payload.players).flatMap((player) => player.units)
+      .find((unit) => unit.unit.id === state.unitID && unit.currentLife > 0);
+    gameStore.setState({
+      ...payload, pending: false, error: null,
+      unitID: selected ? state.unitID : null,
+      attackMode: state.attackMode && payload.currentTurn === state.accountID && payload.status === "playing",
+    });
   }
-};
-
-export const useGameSocket = () => useStore(gameStore, (s) => s);
+});
+export const useGameSocket = gameStore;

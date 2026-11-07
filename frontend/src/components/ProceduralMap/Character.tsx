@@ -1,14 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTick } from "@pixi/react";
 import { Assets, Rectangle, Sprite, Texture } from "pixi.js";
 import sheetUrl from "@/assets/Small-8-Direction-Characters_by_AxulArt/Small-8-Direction-Characters_by_AxulArt.png";
 import { LEVEL_HEIGHT, TILE_HEIGHT, TILE_WIDTH, hasBridge, type MapTile } from "./generator";
-import { getDestination, tileKey } from "./characterMovement";
 
 interface CharacterProps {
-  tiles: readonly MapTile[];
   spawn: MapTile;
-  controls: RefObject<HTMLDivElement | null>;
+  path: readonly MapTile[];
   onMove: (tile: MapTile) => void;
   onError: () => void;
 }
@@ -17,7 +15,6 @@ const FRAME_WIDTH = 16;
 const FRAME_HEIGHT = 24;
 const BOY_BLOCK_Y = 192;
 const STEP_MS = 180;
-const KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "KeyW", "KeyA", "KeyS", "KeyD"]);
 
 function project(tile: MapTile) {
   return {
@@ -28,12 +25,12 @@ function project(tile: MapTile) {
   };
 }
 
-export default function Character({ tiles, spawn, controls, onMove, onError }: CharacterProps) {
+export default function Character({ spawn, path, onMove, onError }: CharacterProps) {
   const spriteRef = useRef<Sprite>(null);
-  const keys = useRef(new Set<string>());
   const motion = useRef({ from: spawn, to: spawn, elapsed: STEP_MS, direction: 4, clock: 0 });
+  const command = useRef<readonly MapTile[] | null>(null);
+  const pending = useRef<MapTile[]>([]);
   const [frames, setFrames] = useState<Texture[][] | null>(null);
-  const lookup = useMemo(() => new Map(tiles.map((tile) => [tileKey(tile.x, tile.y), tile])), [tiles]);
 
   useEffect(() => {
     let active = true;
@@ -56,46 +53,31 @@ export default function Character({ tiles, spawn, controls, onMove, onError }: C
     };
   }, [onError]);
 
-  useEffect(() => {
-    const keydown = (event: KeyboardEvent) => {
-      if (document.activeElement !== controls.current || !KEYS.has(event.code)) return;
-      event.preventDefault();
-      keys.current.add(event.code);
-    };
-    const keyup = (event: KeyboardEvent) => { keys.current.delete(event.code); };
-    const clear = () => keys.current.clear();
-    window.addEventListener("keydown", keydown);
-    window.addEventListener("keyup", keyup);
-    window.addEventListener("blur", clear);
-    return () => {
-      window.removeEventListener("keydown", keydown);
-      window.removeEventListener("keyup", keyup);
-      window.removeEventListener("blur", clear);
-    };
-  }, [controls]);
-
   useTick((ticker) => {
     const sprite = spriteRef.current;
     if (!sprite || !frames) return;
     const state = motion.current;
     const delta = Math.min(ticker.deltaMS, 50);
-    if (document.activeElement !== controls.current) keys.current.clear();
+    if (command.current !== path) {
+      command.current = path;
+      // A new click replaces future steps; finish the tile transition in progress.
+      pending.current = path.slice(1);
+    }
     state.clock += delta;
     state.elapsed = Math.min(STEP_MS, state.elapsed + delta);
     if (state.elapsed >= STEP_MS) {
-      const held = keys.current;
-      const sx = Number(held.has("ArrowRight") || held.has("KeyD")) - Number(held.has("ArrowLeft") || held.has("KeyA"));
-      const sy = Number(held.has("ArrowDown") || held.has("KeyS")) - Number(held.has("ArrowUp") || held.has("KeyW"));
-      if (sx || sy) {
+      const next = pending.current.shift();
+      if (next) {
+        const dx = next.x - state.to.x;
+        const dy = next.y - state.to.y;
+        const sx = dx - dy;
+        const sy = dx + dy;
         // Columns are N, NE, E, SE, S, SW, W, NW, matching screen direction.
         state.direction = (Math.round(Math.atan2(sx, -sy) / (Math.PI / 4)) + 8) % 8;
-        const next = getDestination(state.to, Math.sign(sx + sy), Math.sign(sy - sx), lookup);
-        if (next) {
-          state.from = state.to;
-          state.to = next;
-          state.elapsed = 0;
-          onMove(next);
-        }
+        state.from = state.to;
+        state.to = next;
+        state.elapsed = 0;
+        onMove(next);
       }
     }
     const progress = state.elapsed / STEP_MS;
@@ -118,6 +100,7 @@ export default function Character({ tiles, spawn, controls, onMove, onError }: C
       anchor={{ x: 0.5, y: 0.875 }}
       scale={2}
       roundPixels
+      eventMode="none"
     />
   ) : null;
 }

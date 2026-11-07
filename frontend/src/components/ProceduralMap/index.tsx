@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Application, extend } from "@pixi/react";
-import { Assets, Container, Sprite, type Texture } from "pixi.js";
+import { Assets, Container, Graphics, Polygon, Sprite, type FederatedPointerEvent, type Texture } from "pixi.js";
 import Minimap from "./Minimap";
 import Character from "./Character";
-import { findSpawn } from "./characterMovement";
+import { findPath, findSpawn, isWalkable, tileKey } from "./characterMovement";
 import {
   generateSeededMap,
   hasBridge,
@@ -18,7 +18,9 @@ import {
   type MapTile,
 } from "./generator";
 
-extend({ Container, Sprite });
+extend({ Container, Graphics, Sprite });
+
+const EMPTY_PATH: readonly MapTile[] = [];
 
 export interface ProceduralMapProps {
   /** Number of columns, in tiles. */
@@ -29,7 +31,7 @@ export interface ProceduralMapProps {
   seed?: string;
   /** Show the top-down overview in the corner. */
   showMinimap?: boolean;
-  /** Enable the keyboard-controlled character. */
+  /** Enable the character controlled by clicking tiles. */
   showCharacter?: boolean;
   className?: string;
   /** The parent must provide a height, or set one here (for example, 600). */
@@ -58,6 +60,27 @@ export default function ProceduralMap({
   const reportCharacterError = useCallback(() => setCharacterError(true), []);
   const moveCharacter = useCallback((tile: MapTile) => setCharacterLocation({ tiles, tile }), [tiles]);
   const characterPosition = characterLocation?.tiles === tiles ? characterLocation.tile : spawn;
+  const lookup = useMemo(() => new Map(tiles.map((tile) => [tileKey(tile.x, tile.y), tile])), [tiles]);
+  const [hover, setHover] = useState<{ tiles: MapTile[]; tile: MapTile } | null>(null);
+  const [selection, setSelection] = useState<{ tiles: MapTile[]; path: MapTile[] } | null>(null);
+  const hoveredTile = hover?.tiles === tiles ? hover.tile : undefined;
+  const selectedPath = selection?.tiles === tiles ? selection.path : EMPTY_PATH;
+  const preview = useMemo(() => (
+    showCharacter && !characterError && hoveredTile && characterPosition
+      ? findPath(characterPosition, hoveredTile, lookup) : null
+  ), [showCharacter, characterError, hoveredTile, characterPosition, lookup]);
+  const remainingPath = useMemo(() => {
+    const index = selectedPath.findIndex((tile) => tile === characterPosition);
+    return index >= 0 ? selectedPath.slice(index) : EMPTY_PATH;
+  }, [selectedPath, characterPosition]);
+  const highlightedPath = hoveredTile ? preview ?? EMPTY_PATH : remainingPath;
+  const highlightedKeys = useMemo(() => new Set(highlightedPath.map((tile) => tileKey(tile.x, tile.y))), [highlightedPath]);
+  const destination = highlightedPath[highlightedPath.length - 1];
+  const selectTile = (tile: MapTile) => {
+    if (!showCharacter || characterError || !characterPosition) return;
+    const path = findPath(characterPosition, tile, lookup);
+    if (path) setSelection({ tiles, path });
+  };
 
   const terrainCount = useMemo(() => {
     const count = Object.fromEntries(
@@ -120,14 +143,9 @@ export default function ProceduralMap({
     <div
       ref={containerRef}
       className={className}
-      tabIndex={showCharacter ? 0 : undefined}
       role="group"
-      aria-label="Mapa isométrico. Clique no mapa ou use Tab para focar, e mova o personagem com as setas ou WASD."
-      onPointerDown={(event) => {
-        if (showCharacter && !(event.target instanceof Element && event.target.closest("a, button, input"))) {
-          event.currentTarget.focus({ preventScroll: true });
-        }
-      }}
+      aria-label="Mapa isométrico. Passe o mouse nos tiles para visualizar o caminho e clique para mover o personagem."
+      onPointerLeave={() => setHover(null)}
       style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden", background: "#17231f", ...style }}
     >
       {viewport.width > 0 && viewport.height > 0 ? (
@@ -149,11 +167,28 @@ export default function ProceduralMap({
               const isoX = (tile.x - tile.y) * (TILE_WIDTH / 2);
               const isoY = (tile.x + tile.y) * (TILE_HEIGHT / 2);
               const surfaceY = -tile.height * LEVEL_HEIGHT;
+              const markerY = surfaceY - 42 + (hasBridge(tile) ? -8 : 0);
+              const isHovered = hoveredTile === tile;
+              const isOnPath = highlightedKeys.has(tileKey(tile.x, tile.y));
+              const unreachable = isHovered && !preview;
+              const isDestination = destination === tile;
 
               return (
                 <pixiContainer
                   key={`${tile.x}-${tile.y}`} x={isoX} y={isoY}
                   zIndex={(tile.x + tile.y) * 10 + tile.y * 0.01}
+                  eventMode={showCharacter && !characterError ? "static" : "none"}
+                  interactiveChildren={false}
+                  hitArea={new Polygon([
+                    0, markerY - TILE_HEIGHT / 2,
+                    TILE_WIDTH / 2, markerY,
+                    0, markerY + TILE_HEIGHT / 2,
+                    -TILE_WIDTH / 2, markerY,
+                  ])}
+                  cursor={isWalkable(tile) && !(isHovered && !preview) ? "pointer" : "not-allowed"}
+                  onPointerOver={() => setHover({ tiles, tile })}
+                  onPointerOut={() => setHover((previous) => previous?.tile === tile ? null : previous)}
+                  onPointerTap={(event: FederatedPointerEvent) => { if (event.button === 0) selectTile(tile); }}
                 >
                   {Array.from({ length: tile.height + 1 }, (_, level) => {
                     const asset =
@@ -172,6 +207,22 @@ export default function ProceduralMap({
                       />
                     );
                   })}
+                  {showCharacter && (isOnPath || isHovered) ? (
+                    <pixiGraphics
+                      eventMode="none"
+                      draw={(graphics) => {
+                        const color = unreachable ? 0xef6c67 : isDestination ? 0xffdc62 : 0x78dcb1;
+                        graphics.clear();
+                        graphics.poly([
+                          0, markerY - TILE_HEIGHT / 2,
+                          TILE_WIDTH / 2, markerY,
+                          0, markerY + TILE_HEIGHT / 2,
+                          -TILE_WIDTH / 2, markerY,
+                        ]).fill({ color, alpha: unreachable ? 0.45 : 0.38 })
+                          .stroke({ color, width: isDestination || unreachable ? 2 : 1 });
+                      }}
+                    />
+                  ) : null}
                   {tile.object ? (
                     <pixiSprite
                       texture={textures[tile.object]}
@@ -194,9 +245,8 @@ export default function ProceduralMap({
             {showCharacter && spawn ? (
               <Character
                 key={JSON.stringify([seed, width, height])}
-                tiles={tiles}
                 spawn={spawn}
-                controls={containerRef}
+                path={selectedPath}
                 onMove={moveCharacter}
                 onError={reportCharacterError}
               />
@@ -214,7 +264,8 @@ export default function ProceduralMap({
         <div style={styles.characterInfo}>
           <div>{characterError ? "Não foi possível carregar o personagem."
             : !spawn ? "Sem espaço livre para o personagem nesta seed."
-            : "Clique no mapa · Setas / WASD para mover"}</div>
+            : hoveredTile && !preview ? "Destino inacessível"
+            : "Passe o mouse para ver o caminho · Clique para mover"}</div>
           <a href="https://axulart.itch.io/small-8-direction-characters" target="_blank" rel="noreferrer" style={{ color: "#a7c875" }}>
             Personagem: AxulArt · CC BY 4.0
           </a>
