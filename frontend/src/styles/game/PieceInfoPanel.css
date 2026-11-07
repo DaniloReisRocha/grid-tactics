@@ -1,0 +1,75 @@
+.unit-info-panel {
+  width: 220px;
+  background: #333;
+  color: white;
+  border-radius: 8px;
+  padding: 10px;
+  font-family: sans-serif;
+}
+
+.selected-unit {
+  border: 2px solid #555;
+  border-radius: 6px;
+  padding: 8px;
+  background: #444;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.selected-unit .icon {
+  font-size: 36px;
+  margin-bottom: 5px;
+}
+
+.selected-unit .player {
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.selected-unit .stats div {
+  font-size: 0.9rem;
+  margin: 2px 0;
+}
+
+.no-selection {
+  color: #aaa;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.other-pieces-list {
+  border-top: 1px solid #555;
+  padding-top: 6px;
+}
+
+.other-unit {
+  padding: 6px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  transition: background 0.2s;
+}
+
+.other-unit:hover {
+  background: #555;
+}
+
+.other-unit.selected {
+  background: #666;
+  font-weight: bold;
+}
+
+.attack-btn {
+  margin-top: 12px;
+  padding: 6px 12px;
+  background-color: #77cee9dc;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.attack-btn.pressed {
+  background-color: #e63946;
+}
