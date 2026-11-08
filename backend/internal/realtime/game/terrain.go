@@ -2,16 +2,18 @@ package game
 
 import "github.com/DaniloReisRocha/grid-tactics/backend/models"
 
-func isBridge(cell models.Cell) bool { return cell.Object == "bridgeX" || cell.Object == "bridgeY" }
+func isBridge(cell models.Cell) bool {
+	return cell.Object == models.ObjectBridgeX || cell.Object == models.ObjectBridgeY
+}
 func walkable(cell models.Cell) bool {
 	if isBridge(cell) {
 		return true
 	}
-	if cell.Terrain == "water" {
+	if cell.Terrain == models.TerrainWater {
 		return false
 	}
 	switch cell.Object {
-	case "", "tree", "forest", "rock", "rockDirt":
+	case models.ObjectNone, models.ObjectTree, models.ObjectForest, models.ObjectRock, models.ObjectRockDirt:
 		return true
 	default:
 		return false
@@ -33,10 +35,10 @@ func CanTraverse(from, to models.Cell) bool {
 		return false
 	}
 	for _, cell := range []models.Cell{from, to} {
-		if cell.Object == "bridgeX" && dy != 0 {
+		if cell.Object == models.ObjectBridgeX && dy != 0 {
 			return false
 		}
-		if cell.Object == "bridgeY" && dx != 0 {
+		if cell.Object == models.ObjectBridgeY && dx != 0 {
 			return false
 		}
 	}

@@ -28,7 +28,7 @@ func safeSpawnCandidates(board []models.Cell, count int) []models.Position {
 	candidates := []models.Position{}
 	for _, cell := range region {
 		// Start on solid ground, never on a bridge, in water or inside a structure.
-		if cell.Terrain == "water" || cell.Object != "" {
+		if cell.Terrain == models.TerrainWater || cell.Object != models.ObjectNone {
 			continue
 		}
 		position := models.Position{X: cell.X, Y: cell.Y}

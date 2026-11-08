@@ -27,7 +27,7 @@ func startedSession(t *testing.T) (*GameSession, uuid.UUID, uuid.UUID) {
 	s.Board = []models.Cell{}
 	for y := 0; y < 10; y++ {
 		for x := 0; x < 10; x++ {
-			s.Board = append(s.Board, models.Cell{X: x, Y: y, Terrain: "grass"})
+			s.Board = append(s.Board, models.Cell{X: x, Y: y, Terrain: models.TerrainGrass})
 		}
 	}
 	return s, a, b
@@ -42,7 +42,7 @@ func TestBoardDeterministicAndWaterBudget(t *testing.T) {
 		}
 		water := 0
 		for _, cell := range board {
-			if cell.Terrain == "water" && !isBridge(cell) {
+			if cell.Terrain == models.TerrainWater && !isBridge(cell) {
 				water++
 			}
 		}

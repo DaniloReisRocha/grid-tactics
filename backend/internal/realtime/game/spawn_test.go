@@ -13,7 +13,7 @@ func flatSpawnBoard(width, height int) []models.Cell {
 	board := []models.Cell{}
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
-			board = append(board, models.Cell{X: x, Y: y, Terrain: "grass"})
+			board = append(board, models.Cell{X: x, Y: y, Terrain: models.TerrainGrass})
 		}
 	}
 	return board
@@ -48,7 +48,7 @@ func TestSpawnsKeepFiveTileDistanceAndTwoFreeExits(t *testing.T) {
 				}
 			}
 			cell := cells[unit.Position]
-			if cell.Object != "" || cell.Terrain == "water" {
+			if cell.Object != models.ObjectNone || cell.Terrain == models.TerrainWater {
 				t.Fatalf("seed %d: spawn inside an obstacle", seed)
 			}
 			exits := 0
@@ -73,7 +73,7 @@ func TestSpawnCandidatesRejectStructureTrapsAndDeadEnds(t *testing.T) {
 	board := flatSpawnBoard(15, 15)
 	// Enclose (7,7) with structures; leave (0,0) only one possible exit.
 	for _, p := range []models.Position{{X: 6, Y: 7}, {X: 8, Y: 7}, {X: 7, Y: 6}, {X: 7, Y: 8}, {X: 1, Y: 0}} {
-		board[p.Y*15+p.X].Object = "house"
+		board[p.Y*15+p.X].Object = models.ObjectHouse
 	}
 	for _, position := range safeSpawnCandidates(board, 6) {
 		if position == (models.Position{X: 7, Y: 7}) || position == (models.Position{}) {

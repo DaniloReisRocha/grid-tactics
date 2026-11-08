@@ -23,7 +23,7 @@ func TestMovementCostOnlyChargesClimbing(t *testing.T) {
 func TestPathCostUsesEveryPreviousStepAndCurrentStartingHeight(t *testing.T) {
 	board := []models.Cell{}
 	for x, height := range []int{0, 1, 1, 3, 3, 1, 2} {
-		board = append(board, models.Cell{X: x, Y: 0, Terrain: "grass", Height: height, Elevation: models.ElevationLevel(height)})
+		board = append(board, models.Cell{X: x, Y: 0, Terrain: models.TerrainGrass, Height: height, Elevation: models.ElevationLevel(height)})
 	}
 	path := findPath(board, models.Position{}, models.Position{X: 6}, nil)
 	if len(path) != 6 || pathCost(board, models.Position{}, path) != 10 {
@@ -41,7 +41,7 @@ func TestServerMovementDeductsClimbingCostAndRejectsInsufficientStamina(t *testi
 	s, a, b := startedSession(t)
 	s.Board = nil
 	for x, height := range []int{0, 1, 1, 3, 3, 1, 0} {
-		s.Board = append(s.Board, models.Cell{X: x, Y: 0, Terrain: "grass", Height: height, Elevation: models.ElevationLevel(height)})
+		s.Board = append(s.Board, models.Cell{X: x, Y: 0, Terrain: models.TerrainGrass, Height: height, Elevation: models.ElevationLevel(height)})
 	}
 	s.Players[a].Units[0].Position = models.Position{}
 	s.Players[b].Units[0].Position = models.Position{X: 6}

@@ -21,6 +21,9 @@ interface CharacterProps {
 const FRAME_WIDTH = 16;
 const FRAME_HEIGHT = 24;
 const STEP_MS = 180;
+// The middle pose is idle; the first and last poses are opposite walking steps.
+const IDLE_POSE = 1;
+const WALK_POSES = [0, IDLE_POSE, 2, IDLE_POSE];
 
 function project(tile: MapTile, view: MapView) {
   const position = projectPosition(tile, view);
@@ -107,7 +110,8 @@ export default function Character({ spawn, path, view, onError, model = 2, onSel
     // Interleave the character with terrain columns and their objects.
     const depth = (tile: MapTile) => viewDepth(tile, view);
     sprite.zIndex = depth(state.from) + (depth(state.to) - depth(state.from)) * progress + 5;
-    const pose = progress < 1 ? [1, 0, 2, 0][Math.floor(state.clock / 110) % 4] : 0;
+    if (progress >= 1) state.clock = 0;
+    const pose = progress < 1 ? WALK_POSES[Math.floor(state.clock / 110) % WALK_POSES.length] : IDLE_POSE;
     sprite.texture = frames[(state.direction + (view.reversed ? 4 : 0)) % 8][pose];
   });
 
@@ -115,7 +119,7 @@ export default function Character({ spawn, path, view, onError, model = 2, onSel
   return frames ? (
     <pixiSprite
       ref={registerSprite}
-      texture={frames[4][0]}
+      texture={frames[4][IDLE_POSE]}
       x={initial.x} y={initial.y}
       anchor={{ x: 0.5, y: 0.875 }}
       scale={2}
