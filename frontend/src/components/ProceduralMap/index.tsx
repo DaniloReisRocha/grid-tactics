@@ -3,9 +3,10 @@ import { Application, extend } from "@pixi/react";
 import { Assets, Container, Graphics, Polygon, Sprite, type FederatedPointerEvent, type Texture } from "pixi.js";
 import Minimap from "./Minimap";
 import MapActorRenderer from "./MapActor";
-import StructureOcclusion from "./StructureOcclusion";
+import StructureOcclusion, { type OccludingStructure } from "./StructureOcclusion";
 import type { MapActor, MapInteraction } from "./types";
 import { tileKey } from "./characterMovement";
+import { projectPosition, viewDepth } from "./projection";
 import {
   hasBridge,
   LEVEL_HEIGHT,
@@ -52,17 +53,19 @@ export default function ProceduralMap({
   style,
 }: ProceduralMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const structures = useRef(new Map<string, Sprite>());
+  const structures = useRef(new Map<string, OccludingStructure>());
   const structureRefs = useRef(new Map<string, (sprite: Sprite | null) => void>());
   const selectedSprite = useRef<Sprite | null>(null);
+  const selectedElevation = useRef(0);
+  const registerSelectedElevation = useCallback((height: number) => { selectedElevation.current = height; }, []);
   const registerSelectedSprite = useCallback((sprite: Sprite | null) => { selectedSprite.current = sprite; }, []);
-  const structureRef = (key: string) => {
+  const structureRef = (key: string, terrainLevel?: number) => {
     let callback = structureRefs.current.get(key);
     if (!callback) {
       callback = (sprite: Sprite | null) => {
-        const previous = structures.current.get(key);
+        const previous = structures.current.get(key)?.sprite;
         if (previous && previous !== sprite && !previous.destroyed) previous.alpha = 1;
-        if (sprite) structures.current.set(key, sprite);
+        if (sprite) structures.current.set(key, { sprite, terrainLevel });
         else structures.current.delete(key);
       };
       structureRefs.current.set(key, callback);
@@ -70,10 +73,13 @@ export default function ProceduralMap({
     return callback;
   };
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
-  const [textures, setTextures] = useState<TextureMap | null>(null);
+  const [reversed, setReversed] = useState(false);
+  const view = useMemo(() => ({ width, height, reversed }), [width, height, reversed]);
+  const [textureSets, setTextureSets] = useState<{ normal: TextureMap; reversed: TextureMap } | null>(null);
+  const textures = textureSets?.[reversed ? "reversed" : "normal"];
   const [loadError, setLoadError] = useState(false);
   const tiles = useMemo(() => [...providedTiles]
-    .sort((a, b) => a.x + a.y - b.x - b.y || a.y - b.y), [providedTiles]);
+    .sort((a, b) => viewDepth(a, view) - viewDepth(b, view)), [providedTiles, view]);
   const [characterError, setCharacterError] = useState(false);
   const reportCharacterError = useCallback(() => setCharacterError(true), []);
   const [hover, setHover] = useState<{ tiles: MapTile[]; tile: MapTile } | null>(null);
@@ -129,10 +135,16 @@ export default function ProceduralMap({
   useEffect(() => {
     let isMounted = true;
     Promise.all(Object.entries(TERRAIN_ASSETS).map(async ([asset, source]) => {
-      const texture = await Assets.load<Texture>(source);
-      return [asset, texture] as const;
+      const oppositeSource = source.replace(/_([ES])\.png$/, (_, direction: string) => `_${direction === "E" ? "W" : "N"}.png`);
+      const [normal, reversed] = await Promise.all([
+        Assets.load<Texture>(source), Assets.load<Texture>(oppositeSource),
+      ]);
+      return { asset, normal, reversed };
     })).then((loadedTextures) => {
-      if (isMounted) setTextures(Object.fromEntries(loadedTextures) as TextureMap);
+      if (isMounted) setTextureSets({
+        normal: Object.fromEntries(loadedTextures.map(({ asset, normal }) => [asset, normal])) as TextureMap,
+        reversed: Object.fromEntries(loadedTextures.map(({ asset, reversed }) => [asset, reversed])) as TextureMap,
+      });
     }).catch(() => {
       if (isMounted) setLoadError(true);
     });
@@ -164,8 +176,7 @@ export default function ProceduralMap({
           >
             {/* Draw full columns back to front, so cliffs occlude objects behind them. */}
             {tiles.map((tile) => {
-              const isoX = (tile.x - tile.y) * (TILE_WIDTH / 2);
-              const isoY = (tile.x + tile.y) * (TILE_HEIGHT / 2);
+              const { x: isoX, y: isoY } = projectPosition(tile, view);
               const surfaceY = -tile.height * LEVEL_HEIGHT;
               const markerY = surfaceY - 42 + (hasBridge(tile) ? -8 : 0);
               const isHovered = hoveredTile === tile;
@@ -179,7 +190,7 @@ export default function ProceduralMap({
               return (
                 <pixiContainer
                   key={`${tile.x}-${tile.y}`} x={isoX} y={isoY}
-                  zIndex={(tile.x + tile.y) * 10 + tile.y * 0.01}
+                  zIndex={viewDepth(tile, view)}
                   eventMode={interaction ? "static" : "none"}
                   interactiveChildren={false}
                   hitArea={new Polygon([
@@ -203,7 +214,7 @@ export default function ProceduralMap({
                     return (
                       <pixiSprite
                         key={`ground-${level}`}
-                        ref={level > 0 ? structureRef(`${tile.x},${tile.y}:ground:${level}`) : undefined}
+                        ref={level > 0 ? structureRef(`${tile.x},${tile.y}:ground:${level}`, level) : undefined}
                         texture={textures[asset]}
                         y={-level * LEVEL_HEIGHT}
                         scale={SPRITE_SCALE}
@@ -250,20 +261,32 @@ export default function ProceduralMap({
             })}
             {actors.map((actor) => (
               <MapActorRenderer key={actor.id} actor={actor}
+                view={view}
                 onSelect={interaction?.onSelect}
                 onHover={(tile) => { setHover(tile ? { tiles, tile } : null); interaction?.onHover(tile); }}
                 onSelectedSprite={registerSelectedSprite}
+                onSelectedElevation={registerSelectedElevation}
                 onError={reportCharacterError} />
             ))}
-            <StructureOcclusion structures={structures} selectedSprite={selectedSprite} />
+            <StructureOcclusion structures={structures} selectedSprite={selectedSprite} selectedElevation={selectedElevation} />
           </pixiContainer>
         ) : null}
       </Application>
       ) : null}
 
       {showMinimap ? (
-        <Minimap tiles={tiles} width={width} height={height} actors={actors} />
+        <Minimap tiles={tiles} width={width} height={height} actors={actors} reversed={reversed} />
       ) : null}
+
+      <button
+        type="button"
+        style={styles.rotateButton}
+        aria-label="Inverter visão do mapa em 180 graus"
+        aria-pressed={reversed}
+        onClick={() => { setReversed((previous) => !previous); setHover(null); interaction?.onHover(null); }}
+      >
+        Girar visão 180°
+      </button>
 
       {actors.length > 0 ? (
         <div style={styles.characterInfo}>
@@ -295,6 +318,11 @@ export default function ProceduralMap({
 }
 
 const styles: Record<string, CSSProperties> = {
+  rotateButton: {
+    position: "absolute", top: 16, right: 16, padding: "8px 12px",
+    border: "1px solid rgba(224, 237, 198, 0.3)", borderRadius: 8,
+    background: "rgba(19, 31, 27, 0.94)", color: "#e9eddf", cursor: "pointer",
+  },
   characterInfo: {
     position: "absolute", bottom: 76, left: 16, maxWidth: "55%",
     padding: "7px 10px", borderRadius: 8, color: "#cbd4c8", fontSize: 11,

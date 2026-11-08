@@ -2,33 +2,37 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTick } from "@pixi/react";
 import { Assets, Rectangle, Sprite, Texture } from "pixi.js";
 import sheetUrl from "@/assets/Small-8-Direction-Characters_by_AxulArt/Small-8-Direction-Characters_by_AxulArt.png";
-import { LEVEL_HEIGHT, TILE_HEIGHT, TILE_WIDTH, hasBridge, type MapTile } from "./generator";
+import { LEVEL_HEIGHT, hasBridge, type MapTile } from "./generator";
 import type { CharacterModel } from "./types";
+import { projectPosition, viewDepth, type MapView } from "./projection";
 
 interface CharacterProps {
   spawn: MapTile;
+  view: MapView;
   path: readonly MapTile[];
   onError: () => void;
   model?: CharacterModel;
   onSelect?: () => void;
   onHover?: (hovered: boolean) => void;
   onSprite?: (sprite: Sprite | null) => void;
+  onElevation?: (height: number) => void;
 }
 
 const FRAME_WIDTH = 16;
 const FRAME_HEIGHT = 24;
 const STEP_MS = 180;
 
-function project(tile: MapTile) {
+function project(tile: MapTile, view: MapView) {
+  const position = projectPosition(tile, view);
   return {
-    x: (tile.x - tile.y) * TILE_WIDTH / 2,
+    x: position.x,
     // Ground's top-face center is 42 pixels above its image's bottom anchor.
-    y: (tile.x + tile.y) * TILE_HEIGHT / 2 - tile.height * LEVEL_HEIGHT - 42
+    y: position.y - tile.height * LEVEL_HEIGHT - 42
       + (hasBridge(tile) ? -8 : 0),
   };
 }
 
-export default function Character({ spawn, path, onError, model = 2, onSelect, onHover, onSprite }: CharacterProps) {
+export default function Character({ spawn, path, view, onError, model = 2, onSelect, onHover, onSprite, onElevation }: CharacterProps) {
   const spriteRef = useRef<Sprite>(null);
   const registerSprite = useCallback((sprite: Sprite | null) => {
     spriteRef.current = sprite;
@@ -95,17 +99,19 @@ export default function Character({ spawn, path, onError, model = 2, onSelect, o
       }
     }
     const progress = state.elapsed / STEP_MS;
-    const from = project(state.from);
-    const to = project(state.to);
+    const surfaceHeight = (tile: MapTile) => tile.height + (hasBridge(tile) ? 8 / LEVEL_HEIGHT : 0);
+    onElevation?.(surfaceHeight(state.from) + (surfaceHeight(state.to) - surfaceHeight(state.from)) * progress);
+    const from = project(state.from, view);
+    const to = project(state.to, view);
     sprite.position.set(from.x + (to.x - from.x) * progress, from.y + (to.y - from.y) * progress);
     // Interleave the character with terrain columns and their objects.
-    const depth = (tile: MapTile) => (tile.x + tile.y) * 10 + tile.y * 0.01;
+    const depth = (tile: MapTile) => viewDepth(tile, view);
     sprite.zIndex = depth(state.from) + (depth(state.to) - depth(state.from)) * progress + 5;
     const pose = progress < 1 ? [1, 0, 2, 0][Math.floor(state.clock / 110) % 4] : 0;
-    sprite.texture = frames[state.direction][pose];
+    sprite.texture = frames[(state.direction + (view.reversed ? 4 : 0)) % 8][pose];
   });
 
-  const initial = project(spawn);
+  const initial = project(spawn, view);
   return frames ? (
     <pixiSprite
       ref={registerSprite}

@@ -8,6 +8,7 @@ export interface MapActor {
   model: CharacterModel;
   color: string;
   selected: boolean;
+  defeated: boolean;
 }
 export interface MapInteraction {
   path: readonly { x: number; y: number }[];

@@ -19,6 +19,28 @@ function compile(file, globals = {}) {
   return context.exports;
 }
 
+test("opposite camera reverses depth and projection on rectangular maps without mutating world coordinates", () => {
+  const { viewPosition, projectPosition, viewDepth } = compile("components/ProceduralMap/projection.ts");
+  const normal = { width: 9, height: 5, reversed: false };
+  const reverse = { ...normal, reversed: true };
+  const tiles = Array.from({ length: 45 }, (_, i) => Object.freeze({ x: i % 9, y: Math.floor(i / 9) }));
+  const projectedCorner = projectPosition({ x: 8, y: 4 }, normal);
+  for (const tile of tiles) {
+    const turned = viewPosition(tile, reverse);
+    const restored = viewPosition(turned, reverse);
+    assert.equal(restored.x, tile.x);
+    assert.equal(restored.y, tile.y);
+    const before = projectPosition(tile, normal);
+    const after = projectPosition(tile, reverse);
+    assert.equal(before.x + after.x, projectedCorner.x);
+    assert.equal(before.y + after.y, projectedCorner.y);
+    assert.equal(projectPosition(turned, normal).x, after.x);
+    assert.equal(projectPosition(turned, normal).y, after.y);
+  }
+  assert.ok(viewDepth(tiles[0], normal) < viewDepth(tiles[44], normal));
+  assert.ok(viewDepth(tiles[0], reverse) > viewDepth(tiles[44], reverse));
+});
+
 test("movement prefers cheap terrain and respects stamina, occupied corners and map bounds", () => {
   const { movementOptions } = compile("internal/game/pathfinding.ts");
   const board = [];
@@ -159,6 +181,13 @@ test("only overlapping structures in front of the selected unit fade, then resto
   assert.equal(occludesUnit(unit, 15, overlap, 20), true);
   assert.equal(occludesUnit(unit, 15, overlap, 10), false);
   assert.equal(occludesUnit(unit, 15, overlap, 15), false);
+  // Even intersecting foreground cubes remain solid at or below the unit's level.
+  for (const [height, terrain, expected] of [[0,1,true],[1,1,false],[2,1,false],[2,2,false],[2,3,true],[2,4,true],[1.5,1,false],[1.5,2,true]]) {
+    assert.equal(occludesUnit(unit, 15, overlap, 20, { unit: height, terrain }), expected, `unit level ${height}, ground layer ${terrain}`);
+  }
+  // Taller ground still needs to overlap and be in front, in either camera view.
+  assert.equal(occludesUnit(unit, 15, overlap, 10, { unit: 0, terrain: 3 }), false);
+  assert.equal(occludesUnit(unit, 15, { ...overlap, minX: 40 }, 20, { unit: 0, terrain: 3 }), false);
   assert.equal(occludesUnit(unit, 15, { ...overlap, minX: 40 }, 20), false);
   assert.equal(occludesUnit(unit, 15, { ...overlap, minY: 50 }, 20), false);
   // Moving beyond the obstacle stops the fade, without relying on a server position.

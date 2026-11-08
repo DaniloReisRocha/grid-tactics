@@ -12,8 +12,10 @@ export function occludesUnit(
   unitDepth: number,
   structure: ScreenBounds,
   structureDepth: number,
+  elevation?: { unit: number; terrain: number },
 ) {
-  return structureDepth > unitDepth
+  return (!elevation || elevation.terrain > elevation.unit)
+    && structureDepth > unitDepth
     && structure.minX < unit.maxX && structure.maxX > unit.minX
     && structure.minY < unit.maxY && structure.maxY > unit.minY;
 }

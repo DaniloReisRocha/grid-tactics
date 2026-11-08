@@ -31,13 +31,14 @@ export const Board = () => {
   for (const key of attackTargets) selectable.add(key);
   const preview = hovered && !attackMode ? options?.paths.get(positionKey(hovered)) : undefined;
   const previewPath = preview && selected ? [{ x: selected.x, y: selected.y }, ...preview] : [];
-  const actors = useMemo(() => units.filter((unit) => unit.currentLife > 0).flatMap((unit): MapActor[] => {
+  const actors = useMemo(() => units.flatMap((unit): MapActor[] => {
     const tile = lookup.get(positionKey(unit));
     if (!tile) return [];
     const playerIndex = Math.max(0, turnOrder.indexOf(unit.ownerID));
     const appearance = playerAppearance(id, playerIndex);
     const path = (unit.path ?? []).map((point) => lookup.get(positionKey(point))).filter((point): point is MapTile => Boolean(point));
-    return [{ id: unit.unit.id, tile, path, ...appearance, selected: unit.unit.id === unitID }];
+    const defeated = unit.currentLife <= 0;
+    return [{ id: unit.unit.id, tile, path, ...appearance, defeated, selected: !defeated && unit.unit.id === unitID }];
   }), [units, lookup, turnOrder, id, unitID]);
   const width = Math.max(1, ...board.map((cell) => cell.x + 1));
   const height = Math.max(1, ...board.map((cell) => cell.y + 1));
