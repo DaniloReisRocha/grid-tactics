@@ -10,24 +10,39 @@ const (
 )
 
 type Weapon struct {
-	ID             string `json:"id"`
-	Name           string `json:"name"`
-	Icon           string `json:"icon"`
-	Damage         int    `json:"damage"`
-	Range          int    `json:"range"`
-	LifePenalty    int    `json:"lifePenalty"`
-	StaminaPenalty int    `json:"staminaPenalty"`
-	ToolPenalty    int    `json:"toolPenalty"`
-	Description    string `json:"description"`
+	ID             string   `json:"id"`
+	Name           string   `json:"name"`
+	Icon           string   `json:"icon"`
+	Damage         int      `json:"damage"`
+	Range          int      `json:"range"`
+	LifePenalty    int      `json:"lifePenalty"`
+	StaminaPenalty int      `json:"staminaPenalty"`
+	ToolPenalty    int      `json:"toolPenalty"`
+	Description    string   `json:"description"`
+	Effect         []Effect `json:"effect"`
+}
+
+func (weapon Weapon) HasEffect(id string) bool {
+	for _, effect := range weapon.Effect {
+		if effect.ID == id {
+			return true
+		}
+	}
+	return false
 }
 
 // WeaponOptions returns independent copies of the available weapon definitions.
 // Penalties are reduction amounts: 1 means -1, and 0 means no penalty.
-// Special effects are documented here; combat rules implement their behavior.
+// Each weapon owns its effect slice; catalog lookups never share mutable slices.
 func WeaponOptions() []Weapon {
+	knockback, _ := EffectByID(EffectKnockbackID)
+	shieldBreak, _ := EffectByID(EffectShieldBreakID)
+	noAdjacent, _ := EffectByID(EffectNoAdjacentID)
+	sameLevel, _ := EffectByID(EffectSameLevelID)
 	return []Weapon{
 		{
 			ID:             WeaponPistolID,
+			Effect:         []Effect{},
 			Name:           "Pistola",
 			Icon:           "🔫",
 			Damage:         1,
@@ -38,6 +53,7 @@ func WeaponOptions() []Weapon {
 		},
 		{
 			ID:             WeaponShotgunID,
+			Effect:         []Effect{shieldBreak},
 			Name:           "Escopeta",
 			Icon:           "🏹",
 			Damage:         2,
@@ -48,6 +64,7 @@ func WeaponOptions() []Weapon {
 		},
 		{
 			ID:             WeaponSniperID,
+			Effect:         []Effect{noAdjacent},
 			Name:           "Rifle sniper",
 			Icon:           "🎯",
 			Damage:         3,
@@ -58,6 +75,7 @@ func WeaponOptions() []Weapon {
 		},
 		{
 			ID:             WeaponKatanaID,
+			Effect:         []Effect{sameLevel},
 			Name:           "Katana",
 			Icon:           "🗡️",
 			Damage:         3,
@@ -68,6 +86,7 @@ func WeaponOptions() []Weapon {
 		},
 		{
 			ID:             WeaponWarHammerID,
+			Effect:         []Effect{knockback, sameLevel},
 			Name:           "Martelo de Guerra",
 			Icon:           "🔨",
 			Damage:         3,

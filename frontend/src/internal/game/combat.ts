@@ -1,4 +1,5 @@
-import type { UnitInstance } from "@/api/models";
+import type { Cell, UnitInstance } from "@/api/models";
+import { weaponEffectProblem } from "./effects";
 
 /** Attack allowance is independent of movement stamina; staminaPenalty is ignored. */
 export function canUnitAttack(unit: UnitInstance) {
@@ -10,6 +11,7 @@ export function canUnitAttack(unit: UnitInstance) {
 export function isAttackTarget(
   attacker: UnitInstance,
   target: UnitInstance | undefined,
+  board: readonly Cell[] = [],
 ) {
   if ((target?.x ?? 0) === 5 && (target?.y ?? 0) === 6) {
     console.log("------------------------------------------");
@@ -31,11 +33,15 @@ export function isAttackTarget(
   const dy = Math.abs(target.y - attacker.y);
   const aligned = dx === 0 || dy === 0;
   const distance = dx + dy;
+  const from = board.find((tile) => tile.x === attacker.x && tile.y === attacker.y);
+  const to = board.find((tile) => tile.x === target.x && tile.y === target.y);
+  const allowed = aligned && distance <= attacker.unit.weapons[0].range
+    && !weaponEffectProblem(attacker.unit.weapons[0], distance, from?.height, to?.height);
   if ((target?.x ?? 0) === 5 && (target?.y ?? 0) === 6) {
     console.log("distance => ", distance);
     console.log("range => ", attacker.unit.weapons[0].range);
-    console.log("IF => ", aligned && distance <= attacker.unit.weapons[0].range);
+    console.log("IF => ", allowed);
   }
 
-  return aligned && distance <= attacker.unit.weapons[0].range;
+  return allowed;
 }

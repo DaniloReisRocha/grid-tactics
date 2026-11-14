@@ -24,6 +24,9 @@
 .lab-weapon { margin-top: 12px; font-size: 13px; }
 .lab-weapon p { margin: 8px 0; color: #c7d4ca; }
 .lab-weapon small { color: #97aa9d; font-size: 11px; }
+.lab-effects { display: grid; gap: 4px; padding: 0; margin: 10px 0; list-style: none; font-size: 12px; color: #afe7c7; }
+.lab-effects:empty { display: none; }
+.lab-effects [data-negative="true"] { color: #f5b3a3; }
 .lab-input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
 .lab-card h2 { font-size: 14px; margin: 0 0 12px; }
 .lab-card-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }

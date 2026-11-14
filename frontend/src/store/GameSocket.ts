@@ -49,7 +49,7 @@ export const gameStore = create<GameStore>((set, get) => {
       const target = Object.values(state.players).flatMap((player) => player.units)
         .find((unit) => unit.x === x && unit.y === y && unit.currentLife > 0);
       // An empty/invalid slot must not send an action or change attack mode/pending state.
-      if (!attacker || !isAttackTarget(attacker, target)) return;
+      if (!attacker || !isAttackTarget(attacker, target, state.board)) return;
       act(MessageType.attackPiece, { unitID, to: { x, y } });
     },
     endTurn: () => act(MessageType.endTurn),

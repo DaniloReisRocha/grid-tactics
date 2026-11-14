@@ -37,6 +37,18 @@ func (s *GameSession) Attack(id uuid.UUID, unitID string, target models.Position
 	if dx+dy > weapon.Range {
 		return errors.New("alvo fora de alcance")
 	}
+	cells := make(map[models.Position]models.Cell, len(s.Board))
+	for _, cell := range s.Board {
+		cells[models.Position{X: cell.X, Y: cell.Y}] = cell
+	}
+	from, fromExists := cells[attacker.Position]
+	to, toExists := cells[target]
+	if weapon.HasEffect(models.EffectSameLevelID) && (!fromExists || !toExists) {
+		return errors.New("terreno do atacante ou alvo não encontrado")
+	}
+	if err := ValidateWeaponEffects(weapon, dx+dy, from.Height, to.Height); err != nil {
+		return err
+	}
 	for owner, enemy := range s.Players {
 		if owner == id {
 			continue
@@ -46,10 +58,13 @@ func (s *GameSession) Attack(id uuid.UUID, unitID string, target models.Position
 			if defender.Position != target || defender.CurrentLife <= 0 {
 				continue
 			}
-			damage := max(0, weapon.Damage)
-			absorbed := min(defender.CurrentShield, damage)
-			defender.CurrentShield -= absorbed
-			defender.CurrentLife = max(0, defender.CurrentLife-(damage-absorbed))
+			defender.CurrentLife, defender.CurrentShield = ApplyWeaponDamage(weapon, defender.CurrentLife, defender.CurrentShield)
+			if defender.CurrentLife > 0 {
+				if destination, ok := WeaponKnockback(weapon, attacker.Position, defender.Position, cells, s.occupied()); ok {
+					defender.Path = []models.Position{defender.Position, destination}
+					defender.Position = destination
+				}
+			}
 			attacker.HasAttacked = true
 			alive := false
 			for _, unit := range enemy.Units {

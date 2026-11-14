@@ -44,7 +44,13 @@ test("opposite camera reverses depth and projection on rectangular maps without 
 test("skills lab previews weapon restrictions and reuses movement with free stamina", () => {
   const { labAttackProblem, labMovementUnit, starterTokens } = compile("internal/game/skillsLab.ts");
   const board = Array.from({ length: 225 }, (_, i) => ({ x: i % 15, y: Math.floor(i / 15), terrain: "grass", height: 0, elevation: 0 }));
-  const weapons = [{ id: "pistol", range: 2 }, { id: "shotgun", range: 2 }, { id: "sniper", range: 5 }, { id: "katana", range: 1 }, { id: "warHammer", range: 1 }];
+  const weapons = [
+    { id: "pistol", range: 2, effect: [] },
+    { id: "shotgun", range: 2, effect: [{id:"shieldBreak",negative:false}] },
+    { id: "sniper", range: 5, effect: [{id:"noAdjacentTargets",negative:true}] },
+    { id: "katana", range: 1, effect: [{id:"sameLevelOnly",negative:true}] },
+    { id: "warHammer", range: 1, effect: [{id:"knockback",negative:false},{id:"sameLevelOnly",negative:true}] },
+  ];
   const attacker = { id: "a", team: 0, x: 4, y: 5, life: 6, shield: 0, maxLife: 6, maxShield: 0, weaponID: "pistol", path: [] };
   const target = { ...attacker, id: "b", team: 1, x: 5 };
   for (const weapon of weapons) {
@@ -68,6 +74,27 @@ test("skills lab previews weapon restrictions and reuses movement with free stam
   assert.equal(new Set(starters.map((token) => `${token.x},${token.y}`)).size, 3);
   assert.equal(starters.filter((token) => token.team === 0).length, 1);
   for (const target of starters.slice(1)) assert.ok(target.x === starters[0].x || target.y === starters[0].y);
+});
+
+test("reusable negative effects control multiplayer and lab previews independently of weapon ID", () => {
+  const { weaponEffectProblem } = compile("internal/game/effects.ts");
+  const { isAttackTarget } = compile("internal/game/combat.ts");
+  const { labAttackProblem } = compile("internal/game/skillsLab.ts");
+  const weapon = { id:"pistol",range:3,effect:[{id:"noAdjacentTargets",negative:true},{id:"sameLevelOnly",negative:true}] };
+  assert.ok(weaponEffectProblem(weapon,1,0,0));
+  assert.ok(weaponEffectProblem(weapon,2,0,1));
+  assert.equal(weaponEffectProblem(weapon,2,1,1),null);
+  assert.equal(weaponEffectProblem({...weapon,id:"sniper",effect:[]},1,0,1),null);
+  const attacker = { x:0,y:0,ownerID:"a",currentLife:6,hasAttacked:false,unit:{weapons:[weapon]} };
+  const target = { ...attacker, x:1,ownerID:"b" };
+  const board = [0,1,2].map((x)=>({x,y:0,height:0}));
+  assert.equal(isAttackTarget(attacker,target,board),false);
+  assert.equal(isAttackTarget(attacker,{...target,x:2},board),true);
+  board[2].height = 1;
+  assert.equal(isAttackTarget(attacker,{...target,x:2},board),false);
+  const source = {x:0,y:0,team:0,life:6,weaponID:"pistol"};
+  assert.ok(labAttackProblem(source,{x:1,y:0,team:1,life:6},board,[weapon]));
+  assert.ok(labAttackProblem(source,{x:2,y:0,team:1,life:6},board,[weapon]));
 });
 
 test("movement prefers cheap terrain and respects stamina, occupied corners and map bounds", () => {

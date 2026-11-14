@@ -94,36 +94,17 @@ func ResolveSkillsLabAttack(input models.SkillsLabAttack) (models.SkillsLabResul
 	if distance > weapon.Range {
 		return result, errors.New("alvo fora do alcance da arma")
 	}
-	if weapon.ID == models.WeaponSniperID && distance <= 1 {
-		return result, errors.New("o rifle sniper não atinge unidades adjacentes")
-	}
 	from, to := cells[attacker.Position], cells[target.Position]
-	if (weapon.ID == models.WeaponKatanaID || weapon.ID == models.WeaponWarHammerID) && from.Height != to.Height {
-		return result, errors.New("esta arma exige que atacante e alvo estejam no mesmo nível")
+	if err := game.ValidateWeaponEffects(weapon, distance, from.Height, to.Height); err != nil {
+		return result, err
 	}
 	result.Tokens = append([]models.SkillToken(nil), input.Tokens...)
 	defender := &result.Tokens[targetIndex]
 	oldLife, oldShield := defender.Life, defender.Shield
-	absorbed := min(defender.Shield, weapon.Damage)
-	defender.Shield -= absorbed
-	defender.Life = max(0, defender.Life-(weapon.Damage-absorbed))
-	if weapon.ID == models.WeaponShotgunID {
-		defender.Shield = 0
-	}
+	defender.Life, defender.Shield = game.ApplyWeaponDamage(weapon, defender.Life, defender.Shield)
 	result.Message = fmt.Sprintf("%s: −%d de vida, −%d de escudo.", weapon.Name, oldLife-defender.Life, oldShield-defender.Shield)
-	if weapon.ID == models.WeaponWarHammerID && defender.Life > 0 {
-		sign := func(value int) int {
-			if value < 0 {
-				return -1
-			}
-			if value > 0 {
-				return 1
-			}
-			return 0
-		}
-		destination := models.Position{X: target.X + sign(dx), Y: target.Y + sign(dy)}
-		next, exists := cells[destination]
-		if exists && !occupied[destination] && next.Height <= to.Height && game.CanTraverse(to, next) {
+	if weapon.HasEffect(models.EffectKnockbackID) && defender.Life > 0 {
+		if destination, ok := game.WeaponKnockback(weapon, attacker.Position, target.Position, cells, occupied); ok {
 			defender.Position = destination
 			defender.Path = []models.Position{target.Position, destination}
 			result.Message += " Alvo empurrado um bloco."

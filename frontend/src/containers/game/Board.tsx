@@ -21,7 +21,7 @@ export const Board = () => {
   const attackTargets = new Set<string>();
   if (canAct && attackMode && selected && canUnitAttack(selected)) {
     for (const unit of living.values()) {
-      if (isAttackTarget(selected, unit)) {
+      if (isAttackTarget(selected, unit, board)) {
         attackTargets.add(positionKey(unit));
       }
     }

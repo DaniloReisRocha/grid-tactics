@@ -2,10 +2,17 @@ export type Position = { x: number; y: number };
 import type { MapTile } from "@/components/ProceduralMap/generator";
 
 export type Cell = MapTile;
+export type Effect = {
+  id: string;
+  name: string;
+  description: string;
+  negative: boolean;
+};
 export type Weapon = {
   id: string;
   name: string; icon: string; damage: number; range: number;
   lifePenalty?: number; staminaPenalty: number; toolPenalty: number; description: string;
+  effect: Effect[];
 };
 export type Unit = {
   id: string; lp: number; icon: string; shield: number; stamina: number;

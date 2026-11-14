@@ -66,6 +66,14 @@ Abra `/skills-lab` pelo atalho na página inicial. Não é necessário criar con
 
 O laboratório permite ataques repetidos e mantém as penalidades desativadas. As simulações são isoladas das sessões multiplayer. O registro mostra o dano à vida, ao escudo e o resultado dos empurrões. O cenário é temporário e volta ao estado inicial ao recarregar a página.
 
+## Efeitos das armas
+
+`backend/models/effects.go` define `Effect`, com `id`, `name`, `description` e `negative`. Cada arma possui `effect: []Effect` no JSON, incluindo um array vazio para armas sem efeitos. Os IDs são independentes dos IDs das armas: `knockback`, `shieldBreak`, `noAdjacentTargets` e `sameLevelOnly`.
+
+`negative: true` identifica uma restrição para quem equipa a arma. Os efeitos continuam ativos: “sem ataques adjacentes” restringe a distância mínima, e “mesmo nível” restringe a altura do alvo. Katana e martelo compartilham a mesma definição de restrição de altura. Empurrão e quebra de escudo são efeitos positivos para quem ataca.
+
+O combate multiplayer e o laboratório compartilham a aplicação dos efeitos em `backend/internal/realtime/game/weapon_effects.go`. As prévias do frontend consultam os mesmos IDs de efeito; os efeitos negativos também aparecem no painel do laboratório. Adicionar um efeito existente a outra arma permite reutilizar o comportamento sem verificar o ID da arma.
+
 ## Verificações
 
 No frontend:

@@ -1,6 +1,7 @@
 import type { Cell, UnitInstance, Weapon } from "@/api/models";
 import type { SkillToken } from "@/api/skillsLab";
 import { isWalkable } from "@/components/ProceduralMap/characterMovement";
+import { weaponEffectProblem } from "./effects";
 
 export function labAttackProblem(attacker: SkillToken, target: SkillToken | undefined, board: Cell[], weapons: Weapon[]) {
   if (attacker.life <= 0) return "Escolha um atacante vivo.";
@@ -13,14 +14,10 @@ export function labAttackProblem(attacker: SkillToken, target: SkillToken | unde
   if (dx !== 0 && dy !== 0) return "O alvo precisa estar na mesma linha ou coluna do atacante.";
   const distance = dx + dy;
   if (distance > weapon.range) return "Alvo fora do alcance da arma.";
-  if (weapon.id === "sniper" && distance <= 1) return "O rifle sniper não atinge unidades adjacentes.";
   const from = board.find((tile) => tile.x === attacker.x && tile.y === attacker.y);
   const to = board.find((tile) => tile.x === target.x && tile.y === target.y);
   if (!from || !to) return "Token fora do mapa.";
-  if ((weapon.id === "katana" || weapon.id === "warHammer") && from.height !== to.height) {
-    return "Esta arma exige que atacante e alvo estejam no mesmo nível.";
-  }
-  return null;
+  return weaponEffectProblem(weapon, distance, from.height, to.height);
 }
 
 // Adapt creative tokens to the same movement/path preview used in a real game.

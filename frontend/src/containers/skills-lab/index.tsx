@@ -203,6 +203,9 @@ export default function SkillsLab() {
             </select></label>
             {(() => { const weapon = tool === "add" ? weapons.find((item) => item.id === weaponID) : selectedWeapon;
               return weapon ? <div className="lab-weapon"><strong>Dano {weapon.damage} · Alcance {weapon.range}</strong><p>{weapon.description}</p>
+                <ul className="lab-effects">{weapon.effect.map((effect) => <li key={effect.id} data-negative={effect.negative} title={effect.description}>
+                  {effect.negative ? "−" : "+"} {effect.name}{effect.negative ? " (negativo)" : ""}
+                </li>)}</ul>
                 <small>Penalidades: estamina −{weapon.staminaPenalty} · habilidades −{weapon.toolPenalty}. Desativadas neste modo.</small></div> : <p>Selecione um token ou adicione uma unidade.</p>; })()}
             {tool === "add" ? <div className="lab-input-grid">
               <label>Equipe<select value={team} onChange={(event) => setTeam(Number(event.target.value))}><option value={0}>1 · Azul</option><option value={1}>2 · Amarela</option></select></label>
