@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export const Home = () => {
   const navigate = useNavigate();
@@ -32,6 +32,7 @@ export const Home = () => {
         {error ? <p role="alert">{error}</p> : null}
         <button type="submit">Entrar na partida</button>
       </form>
+      <p><Link to="/skills-lab">Abrir laboratório de skills · Modo criativo</Link></p>
     </main>
   );
 };

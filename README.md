@@ -53,6 +53,19 @@ O spawn reserva espaço para os dois times de uma vez. Todas as unidades começa
 
 O componente compartilhado `ProceduralMap` recebe as dimensões, os tiles e as unidades da partida. A geração do cenário e a escolha dos spawns pertencem ao backend.
 
+## Laboratório de skills
+
+Abra `/skills-lab` pelo atalho na página inicial. Não é necessário criar conta ou entrar em uma partida. O backend precisa estar atualizado e em execução; as chamadas HTTP usam o mesmo servidor configurado em `VITE_WS_URL`.
+
+- Escolha a arena de testes ou gere um mapa procedural por seed.
+- Use **+ Token** para adicionar unidades de duas equipes, escolhendo personagem, arma, vida e escudo.
+- Em **Selecionar / mover**, selecione uma unidade e clique em um destino. O hover mostra a rota, com movimento sem limite de estamina.
+- Equipe uma das cinco armas e use **Testar ataque**. Os alvos válidos ficam destacados. A escopeta quebra o escudo; o sniper não atinge adjacentes; katana e martelo exigem o mesmo nível; o martelo empurra quando o destino permite.
+- Use **Editar terreno** para pintar slots vazios com grama, terra, água, casas, árvores ou rochas, nos níveis de 0 a 3.
+- A lista permite selecionar qualquer token, inclusive derrotados, para restaurar sua vida e escudo. Também é possível remover tokens, limpar a lista e reiniciar o cenário.
+
+O laboratório permite ataques repetidos e mantém as penalidades desativadas. As simulações são isoladas das sessões multiplayer. O registro mostra o dano à vida, ao escudo e o resultado dos empurrões. O cenário é temporário e volta ao estado inicial ao recarregar a página.
+
 ## Verificações
 
 No frontend:

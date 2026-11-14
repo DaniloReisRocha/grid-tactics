@@ -41,6 +41,32 @@ test("opposite camera reverses depth and projection on rectangular maps without 
   assert.ok(viewDepth(tiles[0], reverse) > viewDepth(tiles[44], reverse));
 });
 
+test("skills lab previews weapon restrictions and reuses movement with free stamina", () => {
+  const { labAttackProblem, labMovementUnit, starterTokens } = compile("internal/game/skillsLab.ts");
+  const board = Array.from({ length: 225 }, (_, i) => ({ x: i % 15, y: Math.floor(i / 15), terrain: "grass", height: 0, elevation: 0 }));
+  const weapons = [{ id: "pistol", range: 2 }, { id: "shotgun", range: 2 }, { id: "sniper", range: 5 }, { id: "katana", range: 1 }, { id: "warHammer", range: 1 }];
+  const attacker = { id: "a", team: 0, x: 4, y: 5, life: 6, shield: 0, maxLife: 6, maxShield: 0, weaponID: "pistol", path: [] };
+  const target = { ...attacker, id: "b", team: 1, x: 5 };
+  for (const weapon of weapons) {
+    const user = { ...attacker, weaponID: weapon.id };
+    assert.equal(labAttackProblem(user, target, board, weapons) === null, weapon.id !== "sniper");
+  }
+  assert.equal(labAttackProblem({ ...attacker, weaponID: "sniper" }, { ...target, x: 9 }, board, weapons), null);
+  assert.ok(labAttackProblem({ ...attacker, weaponID: "sniper" }, { ...target, x: 10 }, board, weapons));
+  assert.ok(labAttackProblem(attacker, undefined, board, weapons));
+  assert.ok(labAttackProblem(attacker, { ...target, team: 0 }, board, weapons));
+  assert.ok(labAttackProblem(attacker, { ...target, life: 0 }, board, weapons));
+  board.find((tile) => tile.x === 5 && tile.y === 5).height = 1;
+  for (const id of ["katana", "warHammer"]) assert.ok(labAttackProblem({ ...attacker, weaponID: id }, target, board, weapons));
+  const unit = labMovementUnit(attacker, weapons);
+  assert.equal(unit.currentStamina, 999);
+  assert.equal(unit.unit.weapons[0].id, "pistol");
+  const starters = starterTokens(board, weapons);
+  assert.equal(starters.length, 3);
+  assert.equal(new Set(starters.map((token) => `${token.x},${token.y}`)).size, 3);
+  assert.equal(starters.filter((token) => token.team === 0).length, 1);
+});
+
 test("movement prefers cheap terrain and respects stamina, occupied corners and map bounds", () => {
   const { movementOptions } = compile("internal/game/pathfinding.ts");
   const board = [];

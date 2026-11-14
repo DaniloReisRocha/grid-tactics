@@ -1,0 +1,158 @@
+package service
+
+import (
+	"reflect"
+	"testing"
+
+	"github.com/DaniloReisRocha/grid-tactics/backend/models"
+)
+
+func labFixture(weaponID string, targetX int) models.SkillsLabAttack {
+	config := SkillsLabConfig("test", "arena")
+	return models.SkillsLabAttack{
+		Board: config.Board,
+		Tokens: []models.SkillToken{
+			{ID: "attacker", Team: 0, Position: models.Position{X: 4, Y: 5}, Life: 6, MaxLife: 6, WeaponID: weaponID},
+			{ID: "target", Team: 1, Position: models.Position{X: targetX, Y: 5}, Life: 6, MaxLife: 6, Shield: 3, MaxShield: 3, WeaponID: models.WeaponPistolID},
+		},
+		AttackerID: "attacker", TargetID: "target",
+	}
+}
+
+func TestLabWeaponEffectsAndRepeatedAttacks(t *testing.T) {
+	for _, test := range []struct {
+		weapon                  string
+		x, life, shield, finalX int
+	}{
+		{models.WeaponPistolID, 6, 6, 2, 6},
+		{models.WeaponShotgunID, 6, 6, 0, 6},
+		{models.WeaponSniperID, 9, 6, 0, 9},
+		{models.WeaponKatanaID, 5, 6, 0, 5},
+		{models.WeaponWarHammerID, 5, 6, 0, 6},
+	} {
+		t.Run(test.weapon, func(t *testing.T) {
+			input := labFixture(test.weapon, test.x)
+			before := append([]models.SkillToken(nil), input.Tokens...)
+			result, err := ResolveSkillsLabAttack(input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			target := result.Tokens[1]
+			if target.Life != test.life || target.Shield != test.shield || target.X != test.finalX {
+				t.Fatalf("unexpected target: %+v", target)
+			}
+			if !reflect.DeepEqual(before, input.Tokens) {
+				t.Fatal("simulation mutated caller's tokens")
+			}
+			input.Tokens = result.Tokens
+			// The lab allows further attacks without turns or movement stamina.
+			if test.weapon != models.WeaponWarHammerID {
+				if _, err := ResolveSkillsLabAttack(input); err != nil {
+					t.Fatalf("repeat attack failed: %v", err)
+				}
+			}
+		})
+	}
+	input := labFixture(models.WeaponPistolID, 6)
+	input.Tokens[1].Shield = 0
+	input.Tokens[1].Life = 1
+	result, err := ResolveSkillsLabAttack(input)
+	if err != nil || result.Tokens[1].Life != 0 {
+		t.Fatalf("lethal hit: %+v, %v", result, err)
+	}
+	input.Tokens = result.Tokens
+	if _, err := ResolveSkillsLabAttack(input); err == nil {
+		t.Fatal("dead target accepted")
+	}
+}
+
+func TestLabAttackRestrictionsDoNotChangeTokens(t *testing.T) {
+	for _, name := range []string{"sniper adjacent", "katana height", "hammer height", "out of range", "friendly", "dead attacker", "unknown weapon", "missing target"} {
+		t.Run(name, func(t *testing.T) {
+			input := labFixture(models.WeaponPistolID, 5)
+			switch name {
+			case "sniper adjacent":
+				input.Tokens[0].WeaponID = models.WeaponSniperID
+			case "katana height", "hammer height":
+				input.Tokens[0].WeaponID = models.WeaponKatanaID
+				if name == "hammer height" {
+					input.Tokens[0].WeaponID = models.WeaponWarHammerID
+				}
+				for i := range input.Board {
+					if input.Board[i].X == 5 && input.Board[i].Y == 5 {
+						input.Board[i].Height = 1
+					}
+				}
+			case "out of range":
+				input.Tokens[1].X = 8
+			case "friendly":
+				input.Tokens[1].Team = 0
+			case "dead attacker":
+				input.Tokens[0].Life = 0
+			case "unknown weapon":
+				input.Tokens[0].WeaponID = "invalid"
+			case "missing target":
+				input.TargetID = "missing"
+			}
+			before := append([]models.SkillToken(nil), input.Tokens...)
+			if _, err := ResolveSkillsLabAttack(input); err == nil {
+				t.Fatal("invalid attack accepted")
+			}
+			if !reflect.DeepEqual(before, input.Tokens) {
+				t.Fatal("rejected attack changed tokens")
+			}
+		})
+	}
+}
+
+func TestLabHammerRespectsPushDestination(t *testing.T) {
+	for _, obstacle := range []string{"higher", "water", "house", "occupied", "edge", "downhill"} {
+		t.Run(obstacle, func(t *testing.T) {
+			input := labFixture(models.WeaponWarHammerID, 5)
+			if obstacle == "occupied" {
+				token := input.Tokens[0]
+				token.ID = "blocker"
+				token.X = 6
+				input.Tokens = append(input.Tokens, token)
+			}
+			board := []models.Cell{}
+			for _, cell := range input.Board {
+				if obstacle == "downhill" && cell.Y == 5 && (cell.X == 4 || cell.X == 5) {
+					cell.Height = 1
+				}
+				if cell.X == 6 && cell.Y == 5 {
+					switch obstacle {
+					case "higher":
+						cell.Height = 1
+					case "water":
+						cell.Terrain = models.TerrainWater
+					case "house":
+						cell.Object = models.ObjectHouse
+					case "edge":
+						continue
+					}
+				}
+				board = append(board, cell)
+			}
+			input.Board = board
+			result, err := ResolveSkillsLabAttack(input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantX := 5
+			if obstacle == "downhill" {
+				wantX = 6
+			}
+			if result.Tokens[1].X != wantX || result.Tokens[1].Shield != 0 {
+				t.Fatalf("incorrect push: %+v", result.Tokens[1])
+			}
+		})
+	}
+}
+
+func TestLabScenarioGenerationIsDeterministic(t *testing.T) {
+	a, b := SkillsLabConfig("same-seed", "procedural"), SkillsLabConfig("same-seed", "procedural")
+	if len(a.Board) != 225 || len(a.Weapons) != 5 || !reflect.DeepEqual(a, b) {
+		t.Fatal("invalid or non-deterministic scenario")
+	}
+}

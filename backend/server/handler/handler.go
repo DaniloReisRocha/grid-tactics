@@ -131,6 +131,10 @@ func (h *HTTPServer) Routes(authMiddleware *jwt.GinJWTMiddleware) []endpoint.API
 		// Game soket
 		gsH.GameWs(),
 
+		// Stateless creative mode.
+		SkillsLabHandler{}.Config(),
+		SkillsLabHandler{}.Attack(),
+
 		// Example routes
 		exH.Create(),
 		exH.Update(),
