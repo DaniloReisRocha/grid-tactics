@@ -87,7 +87,10 @@ func ResolveSkillsLabAttack(input models.SkillsLabAttack) (models.SkillsLabResul
 		}
 		return value
 	}
-	distance := max(abs(dx), abs(dy))
+	if dx != 0 && dy != 0 {
+		return result, errors.New("o alvo precisa estar na mesma linha ou coluna do atacante")
+	}
+	distance := abs(dx) + abs(dy)
 	if distance > weapon.Range {
 		return result, errors.New("alvo fora do alcance da arma")
 	}

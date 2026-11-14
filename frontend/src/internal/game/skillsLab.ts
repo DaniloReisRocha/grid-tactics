@@ -8,7 +8,10 @@ export function labAttackProblem(attacker: SkillToken, target: SkillToken | unde
   if (attacker.team === target.team) return "Escolha um alvo da outra equipe.";
   const weapon = weapons.find((item) => item.id === attacker.weaponID);
   if (!weapon) return "Equipe uma arma no atacante.";
-  const distance = Math.max(Math.abs(target.x - attacker.x), Math.abs(target.y - attacker.y));
+  const dx = Math.abs(target.x - attacker.x);
+  const dy = Math.abs(target.y - attacker.y);
+  if (dx !== 0 && dy !== 0) return "O alvo precisa estar na mesma linha ou coluna do atacante.";
+  const distance = dx + dy;
   if (distance > weapon.range) return "Alvo fora do alcance da arma.";
   if (weapon.id === "sniper" && distance <= 1) return "O rifle sniper não atinge unidades adjacentes.";
   const from = board.find((tile) => tile.x === attacker.x && tile.y === attacker.y);
@@ -37,7 +40,8 @@ export function starterTokens(board: Cell[], weapons: Weapon[]): SkillToken[] {
   const anchor = candidates[0];
   const targets = anchor ? candidates.filter((tile) => tile !== anchor
     && tile.height === anchor.height
-    && Math.max(Math.abs(tile.x - anchor.x), Math.abs(tile.y - anchor.y)) <= 2) : [];
+    && (tile.x === anchor.x || tile.y === anchor.y)
+    && Math.abs(tile.x - anchor.x) + Math.abs(tile.y - anchor.y) <= 2) : [];
   const chosen = anchor ? [anchor, ...targets.slice(0, 2)] : [];
   return chosen.map((tile, index) => ({
     id: `starter-${index + 1}`, x: tile.x, y: tile.y, team: index === 0 ? 0 : 1,

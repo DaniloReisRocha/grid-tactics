@@ -31,7 +31,7 @@ func CanTraverse(from, to models.Cell) bool {
 		return false
 	}
 	dx, dy := abs(from.X-to.X), abs(from.Y-to.Y)
-	if max(dx, dy) != 1 {
+	if dx+dy != 1 {
 		return false
 	}
 	for _, cell := range []models.Cell{from, to} {

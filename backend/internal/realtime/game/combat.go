@@ -31,7 +31,10 @@ func (s *GameSession) Attack(id uuid.UUID, unitID string, target models.Position
 	}
 	weapon := attacker.Unit.Weapons[0]
 	dx, dy := abs(attacker.X-target.X), abs(attacker.Y-target.Y)
-	if max(dx, dy) > weapon.Range {
+	if dx != 0 && dy != 0 {
+		return errors.New("o alvo precisa estar na mesma linha ou coluna do atacante")
+	}
+	if dx+dy > weapon.Range {
 		return errors.New("alvo fora de alcance")
 	}
 	for owner, enemy := range s.Players {

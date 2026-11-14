@@ -29,8 +29,8 @@ O frontend lê a URL completa do WebSocket da variável `VITE_WS_URL`, configura
 2. Informe o nome da sessão e entre.
 3. Em outra aba, gere outra conta e entre na mesma sessão.
 4. No seu turno, selecione uma unidade. O hover mostra a rota e o clique envia o destino ao servidor.
-5. Cada passo custa `1 + min(2, max(0, altura do destino - altura de origem))` de stamina. No mesmo nível ou descendo, o custo é 1; subir um nível custa 2 e subir dois ou mais níveis custa 3. O adicional é calculado a cada passo, não pela altitude absoluta do terreno. Árvores, florestas e rochas são transitáveis, sem custo adicional. Unidades vivas, casas e ruínas bloqueiam o caminho. Água só pode ser atravessada por pontes, no sentido da ponte; diagonais não cortam obstáculos.
-6. Para atacar, selecione uma unidade sua, clique em **Atacar** e escolha um inimigo em alcance. Cada unidade pode atacar uma vez por turno, mesmo com stamina zero. Ataques não gastam stamina; a propriedade `staminaPenalty` está temporariamente ignorada. A pistola causa 4 de dano e tem alcance 2. Escudo absorve dano antes da vida. Tentativas inválidas não consomem o ataque, e a disponibilidade é renovada no início do próximo turno do dono da unidade.
+5. Cada passo custa `1 + min(2, max(0, altura do destino - altura de origem))` de stamina. No mesmo nível ou descendo, o custo é 1; subir um nível custa 2 e subir dois ou mais níveis custa 3. O adicional é calculado a cada passo, não pela altitude absoluta do terreno. Árvores, florestas e rochas são transitáveis, sem custo adicional. Unidades vivas, casas e ruínas bloqueiam o caminho. Água só pode ser atravessada por pontes, no sentido da ponte; a locomoção usa apenas as quatro direções do grid, sem passos diagonais.
+6. Para atacar, selecione uma unidade sua, clique em **Atacar** e escolha um inimigo em alcance, na mesma linha ou coluna do atacante. Cada unidade pode atacar uma vez por turno, mesmo com stamina zero. Ataques não gastam stamina; a propriedade `staminaPenalty` está temporariamente ignorada. A pistola causa 4 de dano e tem alcance 2. Escudo absorve dano antes da vida. Tentativas inválidas não consomem o ataque, e a disponibilidade é renovada no início do próximo turno do dono da unidade.
 7. Finalizar o turno passa a vez e recupera a stamina das unidades vivas do próximo jogador.
 
 Eliminar todas as unidades adversárias vence a partida. **Sair da partida** após o início conta como desistência. Uma queda de conexão pausa o jogo; entrar com a mesma conta restaura a partida. Abrir a mesma conta em outra conexão substitui a conexão anterior.
@@ -60,7 +60,7 @@ Abra `/skills-lab` pelo atalho na página inicial. Não é necessário criar con
 - Escolha a arena de testes ou gere um mapa procedural por seed.
 - Use **+ Token** para adicionar unidades de duas equipes, escolhendo personagem, arma, vida e escudo.
 - Em **Selecionar / mover**, selecione uma unidade e clique em um destino. O hover mostra a rota, com movimento sem limite de estamina.
-- Equipe uma das cinco armas e use **Testar ataque**. Os alvos válidos ficam destacados. A escopeta quebra o escudo; o sniper não atinge adjacentes; katana e martelo exigem o mesmo nível; o martelo empurra quando o destino permite.
+- Equipe uma das cinco armas e use **Testar ataque**. Os alvos válidos ficam destacados; ataques só atingem a mesma linha ou coluna do atacante. A escopeta quebra o escudo; o sniper não atinge adjacentes; katana e martelo exigem o mesmo nível; o martelo empurra quando o destino permite.
 - Use **Editar terreno** para pintar slots vazios com grama, terra, água, casas, árvores ou rochas, nos níveis de 0 a 3.
 - A lista permite selecionar qualquer token, inclusive derrotados, para restaurar sua vida e escudo. Também é possível remover tokens, limpar a lista e reiniciar o cenário.
 

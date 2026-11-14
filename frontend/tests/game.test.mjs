@@ -50,6 +50,8 @@ test("skills lab previews weapon restrictions and reuses movement with free stam
   for (const weapon of weapons) {
     const user = { ...attacker, weaponID: weapon.id };
     assert.equal(labAttackProblem(user, target, board, weapons) === null, weapon.id !== "sniper");
+    assert.ok(labAttackProblem(user, { ...target, y: 6 }, board, weapons));
+    assert.ok(labAttackProblem(user, { ...target, y: 7 }, board, weapons));
   }
   assert.equal(labAttackProblem({ ...attacker, weaponID: "sniper" }, { ...target, x: 9 }, board, weapons), null);
   assert.ok(labAttackProblem({ ...attacker, weaponID: "sniper" }, { ...target, x: 10 }, board, weapons));
@@ -65,19 +67,20 @@ test("skills lab previews weapon restrictions and reuses movement with free stam
   assert.equal(starters.length, 3);
   assert.equal(new Set(starters.map((token) => `${token.x},${token.y}`)).size, 3);
   assert.equal(starters.filter((token) => token.team === 0).length, 1);
+  for (const target of starters.slice(1)) assert.ok(target.x === starters[0].x || target.y === starters[0].y);
 });
 
 test("movement prefers cheap terrain and respects stamina, occupied corners and map bounds", () => {
   const { movementOptions } = compile("internal/game/pathfinding.ts");
   const board = [];
   for (let y = 0; y < 3; y++) for (let x = 0; x < 5; x++) {
-    const height = y === 1 && x > 0 && x < 4 ? 2 : 0;
+    const height = y === 1 && x > 0 && x < 4 && x % 2 === 1 ? 2 : 0;
     board.push({ x, y, terrain: "grass", height, elevation: height });
   }
-  const unit = { x: 0, y: 1, currentStamina: 4, currentLife: 3, unit: { id: "a" } };
+  const unit = { x: 0, y: 1, currentStamina: 6, currentLife: 3, unit: { id: "a" } };
   const options = movementOptions(board, unit, [unit]);
-  assert.equal(options.costs.get("4,1"), 4);
-  assert.equal(options.paths.get("4,1").length, 4);
+  assert.equal(options.costs.get("4,1"), 6);
+  assert.equal(options.paths.get("4,1").length, 6);
   assert.equal(options.paths.has("5,1"), false);
   const tired = movementOptions(board, { ...unit, currentStamina: 0 }, [unit]);
   assert.equal(tired.paths.size, 1);
@@ -85,6 +88,29 @@ test("movement prefers cheap terrain and respects stamina, occupied corners and 
   const blocked = movementOptions(board, unit, [unit, blocker]);
   assert.equal(blocked.paths.has("1,1"), false);
   assert.equal(blocked.costs.get("1,0"), 2); // Must walk around the occupied corner.
+});
+
+test("movement previews use four directions and cannot take diagonal shortcuts", () => {
+  const { movementOptions } = compile("internal/game/pathfinding.ts");
+  const { canStep, getDestination } = compile("components/ProceduralMap/characterMovement.ts");
+  const board = Array.from({ length: 9 }, (_, i) => ({ x:i%3,y:Math.floor(i/3),terrain:"grass",height:0 }));
+  const unit = { x:0,y:0,currentStamina:4,currentLife:3,unit:{id:"a"} };
+  const options = movementOptions(board, unit, [unit]);
+  assert.equal(options.costs.get("2,2"), 4);
+  const short = movementOptions(board, { ...unit, currentStamina:1 }, [unit]);
+  assert.equal(short.paths.has("1,1"), false);
+  const lookup = new Map(board.map((tile) => [`${tile.x},${tile.y}`,tile]));
+  assert.equal(canStep(board[0], board[4]), false);
+  assert.equal(getDestination(board[0],1,1,lookup), undefined);
+  for (const path of options.paths.values()) {
+    let previous = unit;
+    for (const step of path) {
+      assert.equal(Math.abs(step.x-previous.x)+Math.abs(step.y-previous.y),1);
+      previous = step;
+    }
+  }
+  const blockers = [{...unit,x:1,unit:{id:"b"}},{...unit,y:1,unit:{id:"c"}}];
+  assert.equal(movementOptions(board, unit, [unit,...blockers]).paths.has("1,1"),false);
 });
 
 test("trees and rocks are passable; buildings, water and bridge orientation still block", () => {
@@ -148,6 +174,8 @@ test("attack availability and targets ignore stamina and staminaPenalty, but enf
   assert.equal(isAttackTarget(attacker,{...target,x:3}),false);
   assert.equal(isAttackTarget(attacker,{...target,ownerID:"a"}),false);
   assert.equal(isAttackTarget(attacker,{...target,currentLife:0}),false);
+  for (const [x,y] of [[2,0],[-2,0],[0,2],[0,-2]]) assert.equal(isAttackTarget(attacker,{...target,x,y}),true);
+  for (const [x,y] of [[1,1],[-1,1],[1,-1],[-1,-1],[1,2]]) assert.equal(isAttackTarget(attacker,{...target,x,y}),false);
   assert.equal(canUnitAttack({...attacker,hasAttacked:true}),false);
   assert.equal(isAttackTarget({...attacker,hasAttacked:true},target),false);
   assert.equal(canUnitAttack({...attacker,currentLife:0}),false);

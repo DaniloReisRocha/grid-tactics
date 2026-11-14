@@ -27,15 +27,15 @@ export function isAttackTarget(
     target.ownerID === attacker.ownerID
   )
     return false;
-  const distance = Math.max(
-    Math.abs(target.x - attacker.x),
-    Math.abs(target.y - attacker.y),
-  );
+  const dx = Math.abs(target.x - attacker.x);
+  const dy = Math.abs(target.y - attacker.y);
+  const aligned = dx === 0 || dy === 0;
+  const distance = dx + dy;
   if ((target?.x ?? 0) === 5 && (target?.y ?? 0) === 6) {
     console.log("distance => ", distance);
     console.log("range => ", attacker.unit.weapons[0].range);
-    console.log("IF => ", distance <= attacker.unit.weapons[0].range);
+    console.log("IF => ", aligned && distance <= attacker.unit.weapons[0].range);
   }
 
-  return distance <= attacker.unit.weapons[0].range;
+  return aligned && distance <= attacker.unit.weapons[0].range;
 }

@@ -60,7 +60,7 @@ func TestPathUsesCheapestTerrainAndBlocksCorners(t *testing.T) {
 	for y := 0; y < 3; y++ {
 		for x := 0; x < 5; x++ {
 			elevation := models.ElevationLow
-			if y == 1 && x > 0 && x < 4 {
+			if y == 1 && x > 0 && x < 4 && x%2 == 1 {
 				elevation = models.ElevationHigh
 			}
 			board = append(board, models.Cell{X: x, Y: y, Elevation: elevation, Height: int(elevation)})
@@ -68,7 +68,7 @@ func TestPathUsesCheapestTerrainAndBlocksCorners(t *testing.T) {
 	}
 	from, to := models.Position{X: 0, Y: 1}, models.Position{X: 4, Y: 1}
 	path := findPath(board, from, to, nil)
-	if len(path) == 0 || pathCost(board, from, path) != 4 {
+	if len(path) == 0 || pathCost(board, from, path) != 6 {
 		t.Fatalf("expected cheaper detour: %+v", path)
 	}
 	if same := findPath(board, from, from, nil); same == nil || len(same) != 0 {

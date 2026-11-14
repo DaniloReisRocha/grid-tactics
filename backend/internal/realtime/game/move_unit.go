@@ -60,7 +60,7 @@ func findPath(board []models.Cell, from, to models.Position, blocked map[models.
 	open := []node{{from, 0}}
 	costs := map[models.Position]int{from: 0}
 	parents := map[models.Position]models.Position{}
-	directions := []models.Position{{X: 1}, {Y: 1}, {X: -1}, {Y: -1}, {X: 1, Y: 1}, {X: -1, Y: 1}, {X: 1, Y: -1}, {X: -1, Y: -1}}
+	directions := []models.Position{{X: 1}, {Y: 1}, {X: -1}, {Y: -1}}
 	for len(open) > 0 {
 		sort.SliceStable(open, func(i, j int) bool { return open[i].cost < open[j].cost })
 		current := open[0]
@@ -83,19 +83,6 @@ func findPath(board []models.Cell, from, to models.Position, blocked map[models.
 			cell, exists := cells[next]
 			if !exists || blocked[next] || !CanTraverse(cells[current.position], cell) {
 				continue
-			}
-			if direction.X != 0 && direction.Y != 0 {
-				sideX := models.Position{X: next.X, Y: current.position.Y}
-				sideY := models.Position{X: current.position.X, Y: next.Y}
-				if side, ok := cells[sideX]; !ok || !CanTraverse(cells[current.position], side) {
-					continue
-				}
-				if side, ok := cells[sideY]; !ok || !CanTraverse(cells[current.position], side) {
-					continue
-				}
-				if blocked[sideX] || blocked[sideY] {
-					continue
-				}
 			}
 			cost := current.cost + movementCost(cells[current.position], cell)
 			previous, seen := costs[next]

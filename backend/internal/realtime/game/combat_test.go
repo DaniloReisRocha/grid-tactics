@@ -12,7 +12,7 @@ func TestEachUnitCanAttackOnceAtZeroStaminaAndResetsOnItsNextTurn(t *testing.T) 
 	s.Players[a].Units[0].CurrentStamina = 0
 	s.Players[a].Units[0].Unit.Weapons[0].StaminaPenalty = 999
 	s.Players[a].Units = append(s.Players[a].Units, models.UnitInstance{
-		Position: models.Position{Y: 1}, OwnerID: a, Player: 1, Unit: testUnit("a2"), CurrentLife: 3, CurrentStamina: 0,
+		Position: models.Position{X: 2}, OwnerID: a, Player: 1, Unit: testUnit("a2"), CurrentLife: 3, CurrentStamina: 0,
 	})
 	s.Players[b].Units[0].Position = models.Position{X: 1}
 	s.Players[b].Units[0].CurrentLife = 30

@@ -10,7 +10,7 @@ import (
 
 const minimumSpawnDistance = 5
 
-// Chebyshev distance counts tile steps with the game's eight movement directions.
+// Keep spawn clearance in both axes, including diagonally neighboring units.
 func spawnDistance(a, b models.Position) int {
 	return max(abs(a.X-b.X), abs(a.Y-b.Y))
 }

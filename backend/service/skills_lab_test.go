@@ -156,3 +156,15 @@ func TestLabScenarioGenerationIsDeterministic(t *testing.T) {
 		t.Fatal("invalid or non-deterministic scenario")
 	}
 }
+
+func TestLabRejectsOffAxisTargetsForEveryWeapon(t *testing.T) {
+	for _, weapon := range models.WeaponOptions() {
+		for _, offset := range []models.Position{{X: 1, Y: 1}, {X: 1, Y: 2}, {X: -1, Y: 1}, {X: 1, Y: -1}, {X: -1, Y: -1}} {
+			input := labFixture(weapon.ID, 5)
+			input.Tokens[1].Position = models.Position{X: input.Tokens[0].X + offset.X, Y: input.Tokens[0].Y + offset.Y}
+			if _, err := ResolveSkillsLabAttack(input); err == nil {
+				t.Fatalf("%s accepted off-axis target %+v", weapon.ID, offset)
+			}
+		}
+	}
+}
