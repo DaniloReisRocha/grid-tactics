@@ -8,7 +8,7 @@ import { createRequire } from "node:module";
 
 function compile(file, globals = {}) {
   const source = readFileSync(new URL(`../src/${file}`, import.meta.url), "utf8")
-    .replaceAll("import.meta.env.VITE_WS_URL", "undefined");
+    .replaceAll("import.meta.env.VITE_WS_URL", '"ws://localhost:8080/api/game-connect"');
   const context = { exports: {}, require: (specifier) => {
     const target = specifier.startsWith("@/") ? specifier.slice(2)
       : path.posix.join(path.posix.dirname(file), specifier);
@@ -213,7 +213,7 @@ function transport() {
     drop(code = 1006) { this.readyState = 3; this.onclose?.({ code }); }
   }
   const { GameSocket } = compile("api/webSocket/GameSocket.ts", {
-    WebSocket: Socket, location: { protocol: "https:", hostname: "example.test" },
+    WebSocket: Socket,
     setTimeout: (fn) => { const id = Symbol(); timers.set(id, fn); return id; },
     clearTimeout: (id) => timers.delete(id),
   });
@@ -227,7 +227,7 @@ test("single lazy WebSocket joins on open, reconnects, and cancels retries on ex
   client.connect("room", "account");
   client.connect("room", "account");
   assert.equal(sockets.length, 1);
-  assert.equal(sockets[0].url, "wss://example.test:8080/api/game-connect");
+  assert.equal(sockets[0].url, "ws://localhost:8080/api/game-connect");
   assert.equal(sockets[0].sent.length, 0);
   sockets[0].open();
   assert.equal(sockets[0].sent[0].type, "joinGame");

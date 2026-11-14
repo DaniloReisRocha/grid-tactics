@@ -38,7 +38,11 @@ export const Board = () => {
     const appearance = playerAppearance(id, playerIndex);
     const path = (unit.path ?? []).map((point) => lookup.get(positionKey(point))).filter((point): point is MapTile => Boolean(point));
     const defeated = unit.currentLife <= 0;
-    return [{ id: unit.unit.id, tile, path, ...appearance, defeated, selected: !defeated && unit.unit.id === unitID }];
+    return [{
+      id: unit.unit.id, tile, path,
+      life: unit.currentLife, shield: unit.currentShield,
+      ...appearance, defeated, selected: !defeated && unit.unit.id === unitID,
+    }];
   }), [units, lookup, turnOrder, id, unitID]);
   const width = Math.max(1, ...board.map((cell) => cell.x + 1));
   const height = Math.max(1, ...board.map((cell) => cell.y + 1));

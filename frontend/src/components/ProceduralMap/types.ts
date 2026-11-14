@@ -5,6 +5,8 @@ export interface MapActor {
   id: string;
   tile: MapTile;
   path: readonly MapTile[];
+  life: number;
+  shield: number;
   model: CharacterModel;
   color: string;
   selected: boolean;

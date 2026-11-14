@@ -3,6 +3,7 @@ import type { MapTile } from "@/components/ProceduralMap/generator";
 
 export type Cell = MapTile;
 export type Weapon = {
+  id: string;
   name: string; icon: string; damage: number; range: number;
   lifePenalty?: number; staminaPenalty: number; toolPenalty: number; description: string;
 };

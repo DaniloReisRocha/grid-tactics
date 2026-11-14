@@ -40,17 +40,6 @@ type UnitInstance struct {
 	Path           []Position `json:"path"`
 }
 
-type Weapon struct {
-	Name           string `json:"name"`
-	Icon           string `json:"icon"`
-	Damage         int    `json:"damage"`
-	Range          int    `json:"range"`
-	LifePenalty    int    `json:"lifePenalty"`
-	StaminaPenalty int    `json:"staminaPenalty"`
-	ToolPenalty    int    `json:"toolPenalty"`
-	Description    string `json:"description"`
-}
-
 type Player struct {
 	AccoID    uuid.UUID      `json:"accoID"`
 	Name      string         `json:"name"`

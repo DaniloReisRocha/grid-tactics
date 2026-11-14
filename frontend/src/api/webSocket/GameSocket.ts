@@ -39,9 +39,7 @@ class GameConnection {
   private open() {
     if (!this.desired) return;
     this.status(this.attempts ? "reconnecting" : "connecting");
-    const url = import.meta.env.VITE_WS_URL
-      || `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.hostname}:8080/api/game-connect`;
-    const socket = new WebSocket(url);
+    const socket = new WebSocket(import.meta.env.VITE_WS_URL);
     this.socket = socket;
     socket.onopen = () => {
       if (this.socket !== socket || !this.desired) return;

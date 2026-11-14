@@ -21,7 +21,7 @@ npm install
 npm run dev
 ```
 
-O frontend usa `ws://<hostname>:8080/api/game-connect` em HTTP e `wss://` em HTTPS. Para outro endereço, configure `VITE_WS_URL` no ambiente do Vite.
+O frontend lê a URL completa do WebSocket da variável `VITE_WS_URL`, configurada em `frontend/.env`.
 
 ## Jogar
 
