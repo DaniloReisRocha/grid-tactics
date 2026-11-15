@@ -10,16 +10,13 @@ export function combatSkillToken(unit: UnitInstance): SkillToken {
     abilityUses:unit.abilityUses,path:unit.path??[],staminaSpent:0,movementMode:unit.movementMode};
 }
 
-export function labAbilityProblem(actor: SkillToken | undefined, ability: Ability | undefined, board: readonly Cell[], tokens: readonly SkillToken[], matchUses: Record<string, number>, target?: Position) {
+export function labAbilityProblem(actor: SkillToken | undefined, ability: Ability | undefined, board: readonly Cell[], tokens: readonly SkillToken[], _matchUses: Record<string, number>, target?: Position) {
   if (!actor || actor.life <= 0) return "Selecione uma unidade viva.";
   if (!ability || !actor.abilityIDs?.includes(ability.id)) return "Equipe a habilidade na unidade.";
   if (ability.passive) return "Passiva: aplicada automaticamente ao equipar.";
-  if (ability.uses === "single" && (actor.abilityUses?.[ability.id] ?? 0) > 0) return "Esta unidade já utilizou a habilidade.";
-  const matchCount = Math.max(matchUses[ability.id] ?? 0, tokens.reduce((sum,token) => sum+(token.abilityUses?.[ability.id] ?? 0),0));
-  if (ability.maxUsesPerMatch > 0 && matchCount >= ability.maxUsesPerMatch) return "Limite por partida atingido.";
+  if (ability.maxUsesPerMatch > 0 && (actor.abilityUses?.[ability.id] ?? 0) >= ability.maxUsesPerMatch) return "Esta unidade atingiu o limite de usos por partida.";
   const has = (id: string) => ability.effect.some((effect) => effect.id === id);
   if (has(EffectID.grantShield) && actor.shield >= ability.shield) return "A unidade já possui o escudo máximo.";
-  if (has(EffectID.createBarricade) && ability.maxActivePerMatch > 0 && board.filter((tile) => tile.object === "barricade").length >= ability.maxActivePerMatch) return "Limite de três barricadas ativas atingido.";
   if (!target) return null;
   const from = board.find((tile) => tile.x === actor.x && tile.y === actor.y);
   const to = board.find((tile) => tile.x === target.x && tile.y === target.y);

@@ -29,17 +29,8 @@ func ResolveAbilityEffects(input models.SkillsLabAbility) (models.SkillsLabAbili
 	if actor.Life <= 0 || !slices.Contains(actor.AbilityIDs, ability.ID) {
 		return result, errors.New("a unidade precisa estar viva e ter a habilidade equipada")
 	}
-	if ability.Uses == models.AbilityUsageSingle && actor.AbilityUses[ability.ID] > 0 {
-		return result, errors.New("esta unidade já utilizou a habilidade")
-	}
-	matchCount := input.MatchAbilityUses[ability.ID]
-	tokenUses := 0
-	for _, token := range input.Tokens {
-		tokenUses += token.AbilityUses[ability.ID]
-	}
-	matchCount = max(matchCount, tokenUses)
-	if ability.MaxUsesPerMatch > 0 && matchCount >= ability.MaxUsesPerMatch {
-		return result, errors.New("limite de uso da habilidade por partida atingido")
+	if ability.MaxUsesPerMatch > 0 && actor.AbilityUses[ability.ID] >= ability.MaxUsesPerMatch {
+		return result, errors.New("esta unidade atingiu o limite de usos da habilidade por partida")
 	}
 	for id, count := range input.MatchAbilityUses {
 		if _, ok := models.AbilityByID(id); !ok || count < 0 || count > 10000 {
@@ -82,15 +73,6 @@ func ResolveAbilityEffects(input models.SkillsLabAbility) (models.SkillsLabAbili
 	if ability.HasEffect(models.EffectCreateBarricadeID) {
 		if distance != 1 || to.Terrain == models.TerrainWater || to.Object != models.ObjectNone || occupied(input.Target) {
 			return result, errors.New("a barricada exige um terreno adjacente livre, seco e do mesmo nível")
-		}
-		active := 0
-		for _, cell := range input.Board {
-			if cell.Object == models.ObjectBarricade {
-				active++
-			}
-		}
-		if ability.MaxActivePerMatch > 0 && active >= ability.MaxActivePerMatch {
-			return result, errors.New("limite de três barricadas ativas atingido")
 		}
 	}
 	if ability.HasEffect(models.EffectLeapID) {
@@ -171,6 +153,7 @@ func ResolveAbilityEffects(input models.SkillsLabAbility) (models.SkillsLabAbili
 		}
 	}
 	unit.AbilityUses[ability.ID]++
-	result.MatchAbilityUses[ability.ID] = matchCount + 1
+	// Aggregate retained for snapshots; only the acting unit's counter enforces limits.
+	result.MatchAbilityUses[ability.ID]++
 	return result, nil
 }

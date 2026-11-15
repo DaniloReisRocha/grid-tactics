@@ -17,9 +17,8 @@ export type Weapon = {
 export type Ability = {
   passive: boolean;
   id: string; name: string; icon: string;
-  uses: "single" | "unlimited";
   range: number; damage: number; shield: number; areaSize: number;
-  maxActivePerMatch: number; maxUsesPerMatch: number;
+  maxUsesPerMatch: number;
   movement?: { forwardDistance: number; climbDistance: number; climbLevels: number };
   description: string; effect: Effect[];
 };

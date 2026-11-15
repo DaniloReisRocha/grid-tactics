@@ -51,13 +51,12 @@ export default function AbilitySelector({ abilities, value, onChange, disabled, 
         <strong>{ability.icon} {ability.name}</strong>
         <p>{ability.description}</p>
         <dl className="lab-skill-stats">
-          <div><dt>Uso</dt><dd>{ability.passive ? "Passiva" : ability.uses === "single" ? "Único" : "Ilimitado"}</dd></div>
+          <div><dt>Tipo</dt><dd>{ability.passive ? "Passiva" : "Ativa"}</dd></div>
           <div><dt>Alcance</dt><dd>{ability.range === 0 ? "Própria unidade" : `${ability.range} terreno(s)`}</dd></div>
           {ability.shield > 0 ? <div><dt>Escudo</dt><dd>{ability.shield}</dd></div> : null}
           {ability.damage > 0 ? <div><dt>Dano</dt><dd>{ability.damage}</dd></div> : null}
           {ability.areaSize > 0 ? <div><dt>Área</dt><dd>{ability.areaSize} × {ability.areaSize}</dd></div> : null}
-          {ability.maxUsesPerMatch > 0 ? <div><dt>Limite por partida</dt><dd>{ability.maxUsesPerMatch} uso(s)</dd></div> : null}
-          {ability.maxActivePerMatch > 0 ? <div><dt>Limite de estruturas ativas</dt><dd>{ability.maxActivePerMatch}</dd></div> : null}
+          {!ability.passive ? <div><dt>Usos por unidade na partida</dt><dd>{ability.maxUsesPerMatch > 0 ? ability.maxUsesPerMatch : "Ilimitados"}</dd></div> : null}
         </dl>
         <ul className="lab-effects">{ability.effect.map((effect) => <li key={effect.id} data-negative={effect.negative} title={effect.description}>
           {effect.negative ? "−" : "+"} {effect.name}{effect.negative ? " (negativo)" : ""}

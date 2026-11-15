@@ -133,11 +133,11 @@ test("passive shields apply on lab equipment once and cannot refill after damage
 test("ability previews enforce usage, cardinal targets, height, and the grenade area", () => {
   const {labAbilityProblem,abilityArea} = compile("internal/game/abilities.ts");
   const board = Array.from({length:225},(_,i)=>({x:i%15,y:Math.floor(i/15),terrain:"grass",height:0}));
-  const base = {uses:"single",range:0,maxUsesPerMatch:0,maxActivePerMatch:0,effect:[]};
+  const base = {range:0,maxUsesPerMatch:1,effect:[]};
   const shield = {...base,id:"shield",passive:true,shield:3,effect:[{id:"grantShield"}]};
-  const barricade = {...base,id:"barricade",range:1,maxActivePerMatch:3,effect:[{id:"createBarricade"},{id:"sameLevelOnly"}]};
+  const barricade = {...base,id:"barricade",range:1,maxUsesPerMatch:3,effect:[{id:"createBarricade"},{id:"sameLevelOnly"}]};
   const jump = {...base,id:"trampoline",range:2,movement:{forwardDistance:2,climbDistance:1,climbLevels:1},effect:[{id:"leap"}]};
-  const grenade = {...base,id:"grenade",uses:"unlimited",range:2,areaSize:3,maxUsesPerMatch:1,effect:[{id:"areaDamageOrShieldBreak"}]};
+  const grenade = {...base,id:"grenade",range:2,areaSize:3,maxUsesPerMatch:1,effect:[{id:"areaDamageOrShieldBreak"}]};
   const actor = {id:"a",x:5,y:5,life:3,shield:0,staminaSpent:4,abilityIDs:["shield","barricade"]};
   assert.ok(labAbilityProblem(actor,shield,board,[actor],{},actor));
   assert.ok(labAbilityProblem({...actor,shield:3},shield,board,[actor],{},actor));
@@ -153,8 +153,14 @@ test("ability previews enforce usage, cardinal targets, height, and the grenade 
   assert.ok(labAbilityProblem(jumper,jump,board,[jumper],{},{x:6,y:5}));
   const grenadier={...actor,abilityIDs:["grenade"]};
   assert.equal(labAbilityProblem(grenadier,grenade,board,[grenadier],{},{x:7,y:5}),null);
-  assert.ok(labAbilityProblem(grenadier,grenade,board,[grenadier],{grenade:1},{x:7,y:5}));
-  assert.ok(labAbilityProblem(grenadier,grenade,board,[grenadier,{...actor,id:"used",abilityUses:{grenade:1}}],{},{x:7,y:5}));
+  assert.equal(labAbilityProblem(grenadier,grenade,board,[grenadier],{grenade:1},{x:7,y:5}),null);
+  assert.equal(labAbilityProblem(grenadier,grenade,board,[grenadier,{...actor,id:"used",abilityUses:{grenade:1}}],{},{x:7,y:5}),null);
+  assert.ok(labAbilityProblem({...grenadier,abilityUses:{grenade:1}},grenade,board,[grenadier],{},{x:7,y:5}));
+  assert.equal(labAbilityProblem({...actor,abilityUses:{barricade:2}},barricade,board,[actor],{barricade:9},{x:5,y:6}),null);
+  assert.ok(labAbilityProblem({...actor,abilityUses:{barricade:3}},barricade,board,[actor],{},{x:5,y:6}));
+  const walls = [0,1,2].map(x=>({x,y:0,object:"barricade"}));
+  assert.equal(labAbilityProblem(actor,barricade,[...board,...walls],[actor],{}),null);
+  assert.ok(labAbilityProblem({...jumper,abilityUses:{trampoline:1}},jump,board,[jumper],{}));
   assert.equal(abilityArea(grenade,{x:7,y:5},board).length,9);
   assert.equal(abilityArea(grenade,{x:0,y:0},board).length,4);
 });

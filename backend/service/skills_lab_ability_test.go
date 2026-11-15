@@ -31,31 +31,38 @@ func TestPassiveShieldCannotBeActivated(t *testing.T) {
 
 func TestBarricadesBlockMovementAndLimitActiveStructures(t *testing.T) {
 	input := abilityFixture(models.AbilityBarricadeID)
+	for i := range input.Board {
+		input.Board[i].Height = 0
+		input.Board[i].Elevation = models.ElevationLow
+		input.Board[i].Terrain = models.TerrainGrass
+		input.Board[i].Object = models.ObjectNone
+	}
 	input.Tokens = nil
-	for i := 0; i < 4; i++ {
-		input.Tokens = append(input.Tokens, models.SkillToken{ID: fmt.Sprint(i), Position: models.Position{X: 2 + i*2, Y: 3}, Life: 3, WeaponID: models.WeaponPistolID, AbilityIDs: []string{models.AbilityBarricadeID}})
+	for i := 0; i < 2; i++ {
+		input.Tokens = append(input.Tokens, models.SkillToken{ID: fmt.Sprint(i), Team: i, Position: models.Position{X: 5 + i*4, Y: 5}, Life: 3, WeaponID: models.WeaponPistolID, AbilityIDs: []string{models.AbilityBarricadeID}})
 	}
-	for i := 0; i < 3; i++ {
-		input.ActorID = fmt.Sprint(i)
-		input.Target = models.Position{X: 2 + i*2, Y: 4}
-		result, err := ResolveSkillsLabAbility(input)
-		if err != nil {
-			t.Fatal(err)
+	for i := 0; i < 2; i++ {
+		for _, delta := range []models.Position{{Y: -1}, {X: -1}, {X: 1}} {
+			input.ActorID = fmt.Sprint(i)
+			input.Target = models.Position{X: 5 + i*4 + delta.X, Y: 5 + delta.Y}
+			result, err := ResolveSkillsLabAbility(input)
+			if err != nil {
+				t.Fatal("each unit must get three independent uses", err)
+			}
+			input.Board, input.Tokens, input.MatchAbilityUses = result.Board, result.Tokens, result.MatchAbilityUses
+			cell := result.Board[input.Target.Y*15+input.Target.X]
+			if cell.Object != models.ObjectBarricade || game.IsWalkable(cell) {
+				t.Fatal("barricade lost passability")
+			}
 		}
-		input.Board, input.Tokens, input.MatchAbilityUses = result.Board, result.Tokens, result.MatchAbilityUses
-		cell := result.Board[4*15+2+i*2]
-		if cell.Object != models.ObjectBarricade || game.IsWalkable(cell) {
-			t.Fatal("barricade did not block its tile")
+		input.Target = models.Position{X: 5 + i*4, Y: 6}
+		if _, err := ResolveSkillsLabAbility(input); err == nil {
+			t.Fatal("fourth use by the same unit accepted")
 		}
 	}
-	input.ActorID = "3"
-	input.Target = models.Position{X: 8, Y: 4}
+	input.Board[4*15+9].Object = models.ObjectNone
 	if _, err := ResolveSkillsLabAbility(input); err == nil {
-		t.Fatal("fourth active barricade accepted")
-	}
-	input.Board[4*15+2].Object = models.ObjectNone
-	if _, err := ResolveSkillsLabAbility(input); err != nil {
-		t.Fatal("limit must count active barricades, not lifetime uses:", err)
+		t.Fatal("destroying a barricade restored a per-match use")
 	}
 }
 
@@ -80,7 +87,7 @@ func TestTrampolineCanLeapOverWaterOrClimbOneLevel(t *testing.T) {
 	}
 }
 
-func TestGrenadeIncludesAlliesBreaksShieldWithoutOverflowAndHasMatchLimit(t *testing.T) {
+func TestGrenadeIncludesAlliesAndHasIndependentUnitLimits(t *testing.T) {
 	input := abilityFixture(models.AbilityGrenadeID)
 	input.Target = models.Position{X: 6, Y: 5}
 	input.Board[5*15+6].Object = models.ObjectBarricade
@@ -106,12 +113,23 @@ func TestGrenadeIncludesAlliesBreaksShieldWithoutOverflowAndHasMatchLimit(t *tes
 	if result.Tokens[0].Life != 1 || result.Tokens[1].Life != 3 || result.Tokens[1].Shield != 0 || result.Tokens[2].Life != 0 || result.Tokens[3].Life != 3 || result.Tokens[4].Life != 3 || result.Tokens[4].Shield != 0 {
 		t.Fatalf("invalid grenade result: %+v", result.Tokens)
 	}
-	input.Tokens = result.Tokens[1:] // Removing the original caster must not renew the grenade.
+	input.Tokens = result.Tokens
 	input.MatchAbilityUses = result.MatchAbilityUses
+	if _, err := ResolveSkillsLabAbility(input); err == nil {
+		t.Fatal("same unit used a second grenade")
+	}
 	input.ActorID = "friend"
 	input.Target = models.Position{X: 6, Y: 4}
+	second, err := ResolveSkillsLabAbility(input)
+	if err != nil {
+		t.Fatal("another unit could not use its own grenade", err)
+	}
+	if second.Tokens[1].AbilityUses[models.AbilityGrenadeID] != 1 || second.Tokens[0].AbilityUses[models.AbilityGrenadeID] != 1 {
+		t.Fatal("unit counters were not independent")
+	}
+	input.Tokens = second.Tokens
 	if _, err := ResolveSkillsLabAbility(input); err == nil {
-		t.Fatal("another unit bypassed the match-wide grenade limit")
+		t.Fatal("second unit used two grenades")
 	}
 }
 
@@ -132,7 +150,7 @@ func TestInvalidAbilitiesDoNotChangeOrConsumeState(t *testing.T) {
 			case "outside":
 				input.Target.X = 99
 			case "used":
-				input.Tokens[0].AbilityUses = map[string]int{models.AbilityBarricadeID: 1}
+				input.Tokens[0].AbilityUses = map[string]int{models.AbilityBarricadeID: 3}
 			case "unequipped":
 				input.Tokens[0].AbilityIDs = nil
 			case "dead":

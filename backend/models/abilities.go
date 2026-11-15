@@ -7,13 +7,6 @@ const (
 	AbilityGrenadeID    = "grenade"
 )
 
-type AbilityUsage string
-
-const (
-	AbilityUsageSingle    AbilityUsage = "single"
-	AbilityUsageUnlimited AbilityUsage = "unlimited"
-)
-
 type AbilityMovement struct {
 	ForwardDistance int `json:"forwardDistance"`
 	ClimbDistance   int `json:"climbDistance"`
@@ -21,20 +14,18 @@ type AbilityMovement struct {
 }
 
 type Ability struct {
-	Passive           bool             `json:"passive"`
-	ID                string           `json:"id"`
-	Name              string           `json:"name"`
-	Icon              string           `json:"icon"`
-	Uses              AbilityUsage     `json:"uses"`
-	Range             int              `json:"range"`
-	Damage            int              `json:"damage"`
-	Shield            int              `json:"shield"`
-	AreaSize          int              `json:"areaSize"`
-	MaxActivePerMatch int              `json:"maxActivePerMatch"`
-	MaxUsesPerMatch   int              `json:"maxUsesPerMatch"`
-	Movement          *AbilityMovement `json:"movement,omitempty"`
-	Description       string           `json:"description"`
-	Effect            []Effect         `json:"effect"`
+	Passive         bool             `json:"passive"`
+	ID              string           `json:"id"`
+	Name            string           `json:"name"`
+	Icon            string           `json:"icon"`
+	Range           int              `json:"range"`
+	Damage          int              `json:"damage"`
+	Shield          int              `json:"shield"`
+	AreaSize        int              `json:"areaSize"`
+	MaxUsesPerMatch int              `json:"maxUsesPerMatch"`
+	Movement        *AbilityMovement `json:"movement,omitempty"`
+	Description     string           `json:"description"`
+	Effect          []Effect         `json:"effect"`
 }
 
 func (ability Ability) HasEffect(id string) bool {
@@ -46,9 +37,8 @@ func (ability Ability) HasEffect(id string) bool {
 	return false
 }
 
-// Usage and per-match limits are independent. Zero means no extra match limit;
-// single-use abilities are still consumed once under their usage policy.
-// The grenade retains the supplied unlimited policy with a one-use match limit.
+// MaxUsesPerMatch applies independently to each unit; zero means unlimited.
+// Passive abilities cannot be activated and do not consume this allowance.
 func AbilityOptions() []Ability {
 	grantShield, _ := EffectByID(EffectGrantShieldID)
 	createBarricade, _ := EffectByID(EffectCreateBarricadeID)
@@ -57,27 +47,27 @@ func AbilityOptions() []Ability {
 	sameLevel, _ := EffectByID(EffectSameLevelID)
 	return []Ability{
 		{
-			ID: AbilityShieldID, Name: "Escudo", Icon: "🛡️", Uses: AbilityUsageSingle,
+			ID: AbilityShieldID, Name: "Escudo", Icon: "🛡️",
 			Shield: UnitShieldCapacity, Passive: true,
 			Description: "Passiva: a unidade inicia a partida com 3 pontos de escudo. A proteção não se regenera entre turnos ou rounds.",
 			Effect:      []Effect{grantShield},
 		},
 		{
-			ID: AbilityBarricadeID, Name: "Barricada", Icon: "🚧", Uses: AbilityUsageSingle,
-			Range: 1, MaxActivePerMatch: 3,
-			Description: "A unidade pode conjurar uma barricada em um terreno adjacente de mesmo nível. É possível manter até 3 barricadas ativas por partida.",
+			ID: AbilityBarricadeID, Name: "Barricada", Icon: "🚧",
+			Range: 1, MaxUsesPerMatch: 3,
+			Description: "Cada unidade equipada pode criar até 3 barricadas por partida, em terrenos adjacentes livres do mesmo nível. Barricadas destruídas não devolvem usos.",
 			Effect:      []Effect{createBarricade, sameLevel},
 		},
 		{
-			ID: AbilityTrampolineID, Name: "Trampolim", Icon: "↗️", Uses: AbilityUsageSingle,
-			Range: 2, Movement: &AbilityMovement{ForwardDistance: 2, ClimbDistance: 1, ClimbLevels: 1},
+			ID: AbilityTrampolineID, Name: "Trampolim", Icon: "↗️",
+			Range: 2, MaxUsesPerMatch: 1, Movement: &AbilityMovement{ForwardDistance: 2, ClimbDistance: 1, ClimbLevels: 1},
 			Description: "A unidade pode se deslocar 2 terrenos à frente ou subir 1 terreno de nível superior.",
 			Effect:      []Effect{leap},
 		},
 		{
-			ID: AbilityGrenadeID, Name: "Granada", Icon: "💣", Uses: AbilityUsageUnlimited,
+			ID: AbilityGrenadeID, Name: "Granada", Icon: "💣",
 			Range: 2, Damage: 2, AreaSize: 3, MaxUsesPerMatch: 1,
-			Description: "Pode ser usada apenas uma vez por partida. Escolha uma área de 3 × 3 dentro do alcance máximo de 2 terrenos da unidade. Todas as unidades na área recebem 2 pontos de dano ou têm seus escudos quebrados.",
+			Description: "Cada unidade equipada pode usar uma granada por partida, independentemente das outras unidades. Escolha uma área de 3 × 3 dentro do alcance máximo de 2 terrenos da unidade. Todas as unidades na área recebem 2 pontos de dano ou têm seus escudos quebrados.",
 			Effect:      []Effect{areaDamageOrShieldBreak},
 		},
 	}

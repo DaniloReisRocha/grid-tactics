@@ -21,8 +21,8 @@ func TestAbilityCatalogSerializesAndSharesEffectDefinitions(t *testing.T) {
 			t.Fatalf("invalid ability JSON: %+v", ability)
 		}
 		ids[ability.ID] = true
-		if ability.Uses != AbilityUsageSingle && ability.Uses != AbilityUsageUnlimited {
-			t.Fatalf("unknown usage: %s", ability.Uses)
+		if ability.MaxUsesPerMatch < 0 {
+			t.Fatalf("invalid usage limit: %d", ability.MaxUsesPerMatch)
 		}
 		for _, effect := range ability.Effect {
 			definition, ok := EffectByID(effect.ID)
@@ -34,10 +34,23 @@ func TestAbilityCatalogSerializesAndSharesEffectDefinitions(t *testing.T) {
 	if _, ok := AbilityByID("missing"); ok {
 		t.Fatal("unknown ability resolved")
 	}
-	// The grenade's inventory usage policy does not remove its match restriction.
-	grenade, _ := AbilityByID(AbilityGrenadeID)
-	if grenade.Uses != AbilityUsageUnlimited || grenade.MaxUsesPerMatch != 1 {
-		t.Fatal("grenade lost its separate one-use match limit")
+	for id, limit := range map[string]int{AbilityBarricadeID: 3, AbilityGrenadeID: 1, AbilityTrampolineID: 1} {
+		ability, _ := AbilityByID(id)
+		if ability.MaxUsesPerMatch != limit {
+			t.Fatalf("%s: incorrect per-unit limit", id)
+		}
+	}
+	var raw []map[string]json.RawMessage
+	if err := json.Unmarshal(encoded, &raw); err != nil {
+		t.Fatal(err)
+	}
+	for _, ability := range raw {
+		if _, exists := ability["uses"]; exists {
+			t.Fatal("redundant uses serialized")
+		}
+		if _, exists := ability["maxActivePerMatch"]; exists {
+			t.Fatal("redundant active limit serialized")
+		}
 	}
 }
 
