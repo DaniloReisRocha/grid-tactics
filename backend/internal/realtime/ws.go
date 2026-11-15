@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/DaniloReisRocha/grid-tactics/backend/internal/utils/origin"
 	"github.com/gofrs/uuid"
 	"github.com/gorilla/websocket"
 )
@@ -32,16 +33,11 @@ func NewWSConnection(w http.ResponseWriter, r *http.Request, allowedOrigins []st
 	upgrader := websocket.Upgrader{
 		ReadBufferSize: 1024, WriteBufferSize: 1024,
 		CheckOrigin: func(r *http.Request) bool {
-			origin := r.Header.Get("Origin")
-			if origin == "" {
+			requestOrigin := r.Header.Get("Origin")
+			if requestOrigin == "" {
 				return true
 			}
-			for _, allowed := range allowedOrigins {
-				if origin == allowed {
-					return true
-				}
-			}
-			return false
+			return origin.Allowed(requestOrigin, allowedOrigins)
 		},
 	}
 	conn, err := upgrader.Upgrade(w, r, nil)

@@ -1,5 +1,6 @@
 import type { Ability, Cell, Position, Weapon } from "./models";
 import type { CharacterModel } from "@/components/ProceduralMap/types";
+import { backendURL, backendHeaders } from "./backendURL";
 
 export interface SkillToken extends Position {
   id: string;
@@ -23,23 +24,17 @@ export interface LabAbilityResult extends LabResult { board: Cell[]; matchAbilit
 export type LabLayout = "arena" | "procedural";
 
 function labURL() {
-  const socketURL = import.meta.env.VITE_WS_URL as string | undefined;
-  const base = socketURL ? new URL(socketURL, window.location.href)
-    : new URL(`${window.location.protocol === "https:" ? "https:" : "http:"}//${window.location.hostname}:8080`);
-  base.protocol = base.protocol === "wss:" || base.protocol === "https:" ? "https:" : "http:";
-  base.pathname = "/api/skills-lab";
-  base.search = "";
-  base.hash = "";
-  return base;
+  return backendURL("/api/skills-lab");
 }
 
 async function request<T>(url: URL, init: RequestInit): Promise<T> {
   let response: Response;
-  try { response = await fetch(url, init); }
+  try { response = await fetch(url, { ...init, headers: backendHeaders(url, init.headers) }); }
   catch (error) {
     if (init.signal?.aborted) throw error;
     throw new Error("Não foi possível acessar o laboratório. Verifique se o backend está atualizado e em execução.");
   }
+  if (response.headers.get("Content-Type")?.includes("text/html")) throw new Error("A API devolveu uma página HTML. Confira o túnel do backend e reinicie o servidor atualizado.");
   const data = await response.json().catch(() => null);
   if (!response.ok) throw new Error(data?.error ?? "Não foi possível executar o teste.");
   return data as T;

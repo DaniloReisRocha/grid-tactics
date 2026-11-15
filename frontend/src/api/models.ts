@@ -32,6 +32,8 @@ export type UnitInstance = Position & {
   path?: Position[];
   currentStamina: number; currentShield: number; currentLife: number; unit: Unit;
   hasAttacked: boolean;
+  abilityUses?: Record<string,number>;
+  movementMode?: "jump" | "";
 };
 export type Player = { name: string; accoID: string; connected: boolean; units: UnitInstance[] };
 export type GameStatus = "waiting" | "playing" | "paused" | "finished";
@@ -39,4 +41,5 @@ export type GameStatePayload = {
   id: string; players: Record<string, Player>; board: Cell[];
   turnOrder: string[]; currentTurn: string | null; turnCounter: number;
   status: GameStatus; winner: string | null; revision: number;
+  matchAbilityUses: Record<string,number>;
 };

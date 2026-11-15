@@ -30,14 +30,16 @@ type Position struct {
 
 type UnitInstance struct {
 	Position
-	Player         int        `json:"player"`
-	OwnerID        uuid.UUID  `json:"ownerID"`
-	CurrentStamina int        `json:"currentStamina"`
-	CurrentShield  int        `json:"currentShield"`
-	CurrentLife    int        `json:"currentLife"`
-	HasAttacked    bool       `json:"hasAttacked"`
-	Unit           Unit       `json:"unit"`
-	Path           []Position `json:"path"`
+	Player         int            `json:"player"`
+	OwnerID        uuid.UUID      `json:"ownerID"`
+	CurrentStamina int            `json:"currentStamina"`
+	CurrentShield  int            `json:"currentShield"`
+	CurrentLife    int            `json:"currentLife"`
+	HasAttacked    bool           `json:"hasAttacked"`
+	AbilityUses    map[string]int `json:"abilityUses"`
+	MovementMode   string         `json:"movementMode,omitempty"`
+	Unit           Unit           `json:"unit"`
+	Path           []Position     `json:"path"`
 }
 
 type Player struct {
@@ -48,13 +50,14 @@ type Player struct {
 }
 
 type GameStatePayload struct {
-	ID          string                `json:"id"`
-	Players     map[uuid.UUID]*Player `json:"players"`
-	Board       []Cell                `json:"board"`
-	TurnOrder   []uuid.UUID           `json:"turnOrder"`
-	CurrentTurn *uuid.UUID            `json:"currentTurn"`
-	TurnCounter int                   `json:"turnCounter"`
-	Status      string                `json:"status"`
-	Winner      *uuid.UUID            `json:"winner"`
-	Revision    uint64                `json:"revision"`
+	ID               string                `json:"id"`
+	Players          map[uuid.UUID]*Player `json:"players"`
+	Board            []Cell                `json:"board"`
+	TurnOrder        []uuid.UUID           `json:"turnOrder"`
+	CurrentTurn      *uuid.UUID            `json:"currentTurn"`
+	TurnCounter      int                   `json:"turnCounter"`
+	Status           string                `json:"status"`
+	Winner           *uuid.UUID            `json:"winner"`
+	Revision         uint64                `json:"revision"`
+	MatchAbilityUses map[string]int        `json:"matchAbilityUses"`
 }

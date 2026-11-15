@@ -69,7 +69,7 @@ func WeaponOptions() []Weapon {
 			Icon:           "🎯",
 			Damage:         3,
 			Range:          5,
-			StaminaPenalty: 2,
+			StaminaPenalty: 1,
 			ToolPenalty:    1,
 			Description:    "Não pode causar dano a unidades adjacentes.",
 		},

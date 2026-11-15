@@ -1,7 +1,13 @@
-import type { Ability, Cell, Position } from "@/api/models";
+import type { Ability, Cell, Position, UnitInstance } from "@/api/models";
 import type { SkillToken } from "@/api/skillsLab";
 import { isWalkable } from "@/components/ProceduralMap/characterMovement";
 import { EffectID } from "./effects";
+
+export function combatSkillToken(unit: UnitInstance): SkillToken {
+  return {id:unit.unit.id,x:unit.x,y:unit.y,team:unit.player-1,model:0,life:unit.currentLife,shield:unit.currentShield,
+    maxLife:unit.unit.lp,maxShield:unit.unit.shield,weaponID:unit.unit.weapons[0]?.id??"pistol",abilityIDs:(unit.unit.abilities??[]).map((item)=>item.id),
+    abilityUses:unit.abilityUses,path:unit.path??[],staminaSpent:0,movementMode:unit.movementMode};
+}
 
 export function labAbilityProblem(actor: SkillToken | undefined, ability: Ability | undefined, board: readonly Cell[], tokens: readonly SkillToken[], matchUses: Record<string, number>, target?: Position) {
   if (!actor || actor.life <= 0) return "Selecione uma unidade viva.";

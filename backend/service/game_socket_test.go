@@ -50,9 +50,8 @@ func sendAction(t *testing.T, conn *websocket.Conn, kind string, payload any) {
 }
 
 func TestTwoClientsMoveTurnReconnectReplaceAndLeave(t *testing.T) {
-	SessionManager = game.NewSessionManager()
 	roster := &GameUnitsGetService{}
-	service := GameWsService{GetUnits: roster.Run, AllowedOrigins: []string{"http://allowed.test"}}
+	service := GameWsService{Sessions: game.NewSessionManager(), GetUnits: roster.Run, AllowedOrigins: []string{"http://allowed.test"}}
 	server := httptest.NewServer(http.HandlerFunc(service.Receive))
 	defer server.Close()
 	url := "ws" + strings.TrimPrefix(server.URL, "http")
@@ -185,5 +184,55 @@ func TestSocketRejectsUnlistedOrigin(t *testing.T) {
 	}
 	if err == nil || response == nil || response.StatusCode != http.StatusForbidden {
 		t.Fatal("unlisted origin accepted")
+	}
+}
+
+func TestSelectedTeamAndSkillPersistOnWebSocketReconnect(t *testing.T) {
+	roster := &GameUnitsGetService{}
+	svc := GameWsService{Sessions: game.NewSessionManager(), GetUnits: roster.Run}
+	server := httptest.NewServer(http.HandlerFunc(svc.Receive))
+	defer server.Close()
+	url := "ws" + strings.TrimPrefix(server.URL, "http")
+	dial := func() *websocket.Conn {
+		c, _, err := websocket.DefaultDialer.Dial(url, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+	a, b := uuid.Must(uuid.NewV4()), uuid.Must(uuid.NewV4())
+	one, two := dial(), dial()
+	defer one.Close()
+	defer two.Close()
+	selection := testTeam()
+	sendAction(t, one, joinGame, joinGameAction{SessionID: "selected-team", AccoID: a.String(), Team: selection})
+	readState(t, one, "waiting")
+	sendAction(t, two, joinGame, joinGameAction{SessionID: "selected-team", AccoID: b.String()})
+	state := readState(t, one, "playing")
+	readState(t, two, "playing")
+	for i, unit := range state.Players[a].Units {
+		if unit.Unit.Weapons[0].ID != selection[i].WeaponID || len(unit.Unit.Abilities) != len(selection[i].AbilityIDs) || unit.CurrentStamina != unit.Unit.EffectiveStamina() {
+			t.Fatal("selected equipment did not reach the game")
+		}
+	}
+	unit := state.Players[a].Units[0]
+	sendAction(t, one, useAbility, useAbilityAction{UnitID: unit.Unit.ID, AbilityID: models.AbilityShieldID, To: unit.Position})
+	state = readState(t, one, "playing")
+	readState(t, two, "playing")
+	if state.Players[a].Units[0].CurrentShield != 3 {
+		t.Fatal("equipped skill did not execute over websocket")
+	}
+	one.Close()
+	readState(t, two, "paused")
+	reconnected := dial()
+	defer reconnected.Close()
+	// An attempted equipment change during rejoin must preserve the confirmed roster.
+	selection[0].WeaponID = models.WeaponKatanaID
+	sendAction(t, reconnected, joinGame, joinGameAction{SessionID: "selected-team", AccoID: a.String(), Team: selection})
+	state = readState(t, reconnected, "playing")
+	readState(t, two, "playing")
+	unit = state.Players[a].Units[0]
+	if unit.Unit.Weapons[0].ID != models.WeaponPistolID || unit.CurrentShield != 3 || unit.AbilityUses[models.AbilityShieldID] != 1 {
+		t.Fatal("reconnection changed loadout or restored consumed skill")
 	}
 }

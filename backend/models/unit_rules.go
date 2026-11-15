@@ -16,3 +16,11 @@ func (unit Unit) EffectiveStamina() int {
 	}
 	return max(0, unit.Stamina-penalty)
 }
+
+func (unit Unit) EffectiveAbilitySlots() int {
+	penalty := 0
+	for _, weapon := range unit.Weapons {
+		penalty += max(0, weapon.ToolPenalty)
+	}
+	return max(0, unit.AbilitySlots-penalty)
+}

@@ -1,18 +1,23 @@
 import { create } from "zustand";
 import type { GameStatePayload } from "@/api/models";
+import type { UnitLoadout } from "@/api/team";
 import { GameSocket, MessageType, type ConnectionStatus } from "@/api/webSocket/GameSocket";
 import { canUnitAttack, isAttackTarget, isBarricadeTarget } from "@/internal/game/combat";
 
 const emptyGame: GameStatePayload = {
   id: "", players: {}, board: [], turnOrder: [], currentTurn: null,
   turnCounter: 0, status: "waiting", winner: null, revision: -1,
+  matchAbilityUses: {},
 };
 type GameStore = GameStatePayload & {
   accountID: string; unitID: string | null; attackMode: boolean;
+  skillMode: string | null;
+  setSkillMode: (id: string | null) => void;
+  activateAbility: (unitID: string, abilityID: string, x: number, y: number) => void;
   connection: ConnectionStatus; error: string | null; pending: boolean;
   setUnit: (unitID: string) => void;
   setAttackMode: (active: boolean) => void;
-  joinGame: (sessionID: string, accoID: string) => void;
+  joinGame: (sessionID: string, accoID: string, team?: UnitLoadout[]) => void;
   leaveGame: (forfeit?: boolean) => void;
   movePiece: (unitID: string, x: number, y: number) => void;
   attackPiece: (unitID: string, x: number, y: number) => void;
@@ -28,19 +33,21 @@ export const gameStore = create<GameStore>((set, get) => {
     set({ pending: true, error: null });
   };
   return {
-    ...emptyGame, accountID: "", unitID: null, attackMode: false,
+    ...emptyGame, accountID: "", unitID: null, attackMode: false, skillMode: null,
     connection: "disconnected", error: null, pending: false,
-    setUnit: (unitID) => set({ unitID, attackMode: false }),
-    setAttackMode: (attackMode) => set({ attackMode }),
+    setUnit: (unitID) => set({ unitID, attackMode: false, skillMode: null }),
+    setAttackMode: (attackMode) => set({ attackMode, skillMode: null }),
+    setSkillMode: (skillMode) => set({ skillMode, attackMode: false }),
+    activateAbility: (unitID,abilityID,x,y) => act(MessageType.useAbility,{unitID,abilityID,to:{x,y}}),
     clearError: () => set({ error: null }),
-    joinGame: (sessionID, accountID) => {
-      set({ ...emptyGame, id: sessionID, accountID, unitID: null, attackMode: false, error: null, pending: false });
-      GameSocket.connect(sessionID, accountID);
+    joinGame: (sessionID, accountID, team) => {
+      set({ ...emptyGame, id: sessionID, accountID, unitID: null, attackMode: false, skillMode:null, error: null, pending: false });
+      GameSocket.connect(sessionID, accountID, team);
     },
     leaveGame: (forfeit = false) => {
       if (forfeit) GameSocket.sendAction(MessageType.leaveGame);
       GameSocket.disconnect();
-      set({ ...emptyGame, accountID: "", unitID: null, attackMode: false, error: null, pending: false });
+      set({ ...emptyGame, accountID: "", unitID: null, attackMode: false, skillMode:null, error: null, pending: false });
     },
     movePiece: (unitID, x, y) => act(MessageType.movePiece, { unitID, to: { x, y } }),
     attackPiece: (unitID, x, y) => {
@@ -69,6 +76,7 @@ GameSocket.subscribe((message) => {
       .find((unit) => unit.unit.id === state.unitID && unit.currentLife > 0);
     gameStore.setState({
       ...payload, pending: false, error: null,
+      skillMode: null,
       board: JSON.stringify(payload.board) === JSON.stringify(state.board) ? state.board : payload.board,
       unitID: selected ? state.unitID : null,
       attackMode: state.attackMode && payload.currentTurn === state.accountID && payload.status === "playing"

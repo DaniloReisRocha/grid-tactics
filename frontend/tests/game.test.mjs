@@ -8,16 +8,25 @@ import { createRequire } from "node:module";
 
 function compile(file, globals = {}) {
   const source = readFileSync(new URL(`../src/${file}`, import.meta.url), "utf8")
-    .replaceAll("import.meta.env.VITE_WS_URL", '"ws://localhost:8080/api/game-connect"');
+    .replaceAll("import.meta.env.VITE_WS_URL", '"ws://localhost:8080/api/game-connect"')
+    .replaceAll("import.meta.env.VITE_API_URL", '"https://api.example.test"');
   const context = { exports: {}, require: (specifier) => {
     const target = specifier.startsWith("@/") ? specifier.slice(2)
       : path.posix.join(path.posix.dirname(file), specifier);
     return compile(target.endsWith(".ts") ? target : `${target}.ts`);
   }, ...globals };
   vm.createContext(context);
-  vm.runInContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, context);
+  vm.runInContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText, context);
   return context.exports;
 }
+
+test("HTTP API uses its own URL independently of the WebSocket host", () => {
+  const { backendURL } = compile("api/backendURL.ts", {
+    URL, window: { location: { href: "https://frontend.example.test/" } },
+  });
+  assert.equal(backendURL("/api/team-options").href, "https://api.example.test/api/team-options");
+  assert.equal(backendURL("/api/skills-lab").href, "https://api.example.test/api/skills-lab");
+});
 
 test("opposite camera reverses depth and projection on rectangular maps without mutating world coordinates", () => {
   const { viewPosition, projectPosition, viewDepth } = compile("components/ProceduralMap/projection.ts");
@@ -381,6 +390,40 @@ function transport() {
   });
   return { client: GameSocket, sockets, timers };
 }
+
+test("HTTP requests skip ngrok browser warning while preserving JSON headers",()=>{
+  const {backendHeaders}=compile("api/backendURL.ts",{Headers});
+  const remote=backendHeaders(new URL("https://example.ngrok-free.app/api/team-options"),{"Content-Type":"application/json"});
+  assert.equal(remote.get("ngrok-skip-browser-warning"),"1");
+  assert.equal(remote.get("Accept"),"application/json");assert.equal(remote.get("Content-Type"),"application/json");
+  assert.equal(backendHeaders(new URL("http://localhost:8080/api/team-options")).has("ngrok-skip-browser-warning"),false);
+  assert.equal(backendHeaders(new URL("https://example.ngrok-free.app.attacker.test/api")).has("ngrok-skip-browser-warning"),false);
+});
+
+test("team drafts validate slot penalties and remain isolated by account and session", () => {
+  const {defaultTeam,validateTeam,saveMatchTeam,readMatchTeam,loadTeamDraft}=compile("internal/game/team.ts");
+  const options={unitCount:3,abilitySlots:2,weapons:[{id:"pistol",toolPenalty:0},{id:"sniper",toolPenalty:1}],abilities:[{id:"shield"},{id:"trampoline"}]};
+  const team=defaultTeam();team[0].abilityIDs=["shield","trampoline"];
+  assert.equal(validateTeam(team,options),null);
+  const records=new Map();const storage={getItem:(key)=>records.get(key)??null,setItem:(key,value)=>records.set(key,value)};
+  saveMatchTeam("room","account-a",team,storage);
+  assert.equal(readMatchTeam("room","account-a",storage)[0].abilityIDs[1],"trampoline");
+  assert.equal(readMatchTeam("room","account-b",storage),undefined);
+  assert.equal(readMatchTeam("other-room","account-a",storage),undefined);
+  team[0].weaponID="sniper";assert.ok(validateTeam(team,options));
+  team[0].weaponID="pistol";team[0].abilityIDs=["shield","shield"];assert.ok(validateTeam(team,options));
+  assert.equal(readMatchTeam("room","account-a",storage)[0].abilityIDs[1],"trampoline");
+  records.set("grid-tactics.team.draft","invalid JSON");assert.equal(loadTeamDraft(storage).length,3);
+});
+
+test("connection snapshots the chosen team and resends it unchanged when reconnecting",()=>{
+  const {client,sockets,timers}=transport();
+  const team=Array.from({length:3},()=>({weaponID:"pistol",abilityIDs:["shield"]}));
+  client.connect("room","account",team);team[0].weaponID="sniper";team[0].abilityIDs[0]="grenade";
+  sockets[0].open();assert.equal(sockets[0].sent[0].payload.team[0].weaponID,"pistol");
+  sockets[0].drop();const retry=[...timers.values()][0];timers.clear();retry();sockets[1].open();
+  assert.equal(sockets[1].sent[0].payload.team[0].abilityIDs[0],"shield");client.disconnect();
+});
 
 test("single lazy WebSocket joins on open, reconnects, and cancels retries on exit", () => {
   const { client, sockets, timers } = transport();

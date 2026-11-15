@@ -76,6 +76,7 @@ func (s *GameSession) Attack(id uuid.UUID, unitID string, target models.Position
 			if defender.CurrentLife > 0 {
 				if destination, ok := WeaponKnockback(weapon, attacker.Position, defender.Position, cells, s.occupied()); ok {
 					defender.Path = []models.Position{defender.Position, destination}
+					defender.MovementMode = ""
 					defender.Position = destination
 				}
 			}

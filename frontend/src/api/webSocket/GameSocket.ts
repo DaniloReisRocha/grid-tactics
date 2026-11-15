@@ -1,9 +1,11 @@
 import type { GameStatePayload } from "@/api/models";
+import type { UnitLoadout } from "@/api/team";
 
 export const MessageType = {
   echo: "echo", joinGame: "joinGame", movePiece: "movePiece",
   attackPiece: "attackPiece", endTurn: "endTurn", leaveGame: "leaveGame",
   actionFailed: "actionFailed", gameStateUpdate: "gameStateUpdate",
+  useAbility: "useAbility",
 } as const;
 
 export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "reconnecting";
@@ -14,7 +16,7 @@ export type ServerMessage =
 
 class GameConnection {
   private socket: WebSocket | null = null;
-  private desired: { sessionID: string; accoID: string } | null = null;
+  private desired: { sessionID: string; accoID: string; team?: UnitLoadout[] } | null = null;
   private retry: ReturnType<typeof setTimeout> | undefined;
   private attempts = 0;
   private messages = new Set<(message: ServerMessage) => void>();
@@ -29,11 +31,11 @@ class GameConnection {
     return () => { this.statuses.delete(listener); };
   }
   private status(status: ConnectionStatus) { this.statuses.forEach((listener) => listener(status)); }
-  connect(sessionID: string, accoID: string) {
+  connect(sessionID: string, accoID: string, team?: UnitLoadout[]) {
     if (this.desired?.sessionID === sessionID && this.desired.accoID === accoID
       && this.socket && this.socket.readyState <= WebSocket.OPEN) return;
     this.disconnect();
-    this.desired = { sessionID, accoID };
+    this.desired = { sessionID, accoID, ...(team ? { team: team.map((unit) => ({ weaponID: unit.weaponID, abilityIDs: [...unit.abilityIDs] })) } : {}) };
     this.open();
   }
   private open() {

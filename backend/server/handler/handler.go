@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/DaniloReisRocha/grid-tactics/backend/internal/utils/endpoint"
+	"github.com/DaniloReisRocha/grid-tactics/backend/internal/utils/origin"
 	"github.com/DaniloReisRocha/grid-tactics/backend/server/middleware"
 	"github.com/DaniloReisRocha/grid-tactics/backend/service"
 	jwt "github.com/appleboy/gin-jwt/v2"
@@ -37,6 +38,15 @@ type HTTPServer struct {
 	JWTConfig  JWTConfig
 }
 
+func apiCORSConfig(origins []string) cors.Config {
+	return cors.Config{
+		AllowOriginFunc:  func(value string) bool { return origin.Allowed(value, origins) },
+		AllowMethods:     []string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodPost, http.MethodDelete, http.MethodOptions},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "ngrok-skip-browser-warning"},
+		AllowCredentials: true,
+	}
+}
+
 func (h *HTTPServer) validateDeps() error {
 	if h.DB == nil {
 		return errors.New("missing dependency")
@@ -57,12 +67,7 @@ func (h *HTTPServer) Register(engine *gin.Engine) error {
 	engine.Use(gin.Logger())
 
 	// CORS
-	engine.Use(cors.New(cors.Config{
-		AllowOrigins:     h.ServerConf.AllowedOrigins,
-		AllowMethods:     []string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodPost, http.MethodDelete},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
-		AllowCredentials: true,
-	}))
+	engine.Use(cors.New(apiCORSConfig(h.ServerConf.AllowedOrigins)))
 
 	// Session middleware
 	store := cookie.NewStore([]byte(h.JWTConfig.Secret))
@@ -130,6 +135,7 @@ func (h *HTTPServer) Routes(authMiddleware *jwt.GinJWTMiddleware) []endpoint.API
 
 		// Game soket
 		gsH.GameWs(),
+		TeamHandler{}.Options(),
 
 		// Stateless creative mode.
 		SkillsLabHandler{}.Config(),

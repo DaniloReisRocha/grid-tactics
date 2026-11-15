@@ -20,24 +20,40 @@ const (
 	attackPiece  = "attackPiece"
 	endTurn      = "endTurn"
 	leaveGame    = "leaveGame"
+	useAbility   = "useAbility"
 	actionFailed = "actionFailed"
 )
 
 var SessionManager = game.NewSessionManager()
 
 type joinGameAction struct {
-	SessionID string `json:"sessionID"`
-	AccoID    string `json:"accoID"`
+	SessionID string               `json:"sessionID"`
+	AccoID    string               `json:"accoID"`
+	Team      []models.UnitLoadout `json:"team,omitempty"`
 }
 type movePieceAction struct {
 	UnitID string          `json:"unitID"`
 	To     models.Position `json:"to"`
 }
+type useAbilityAction struct {
+	UnitID    string          `json:"unitID"`
+	AbilityID string          `json:"abilityID"`
+	To        models.Position `json:"to"`
+}
 type GameWsService struct {
+	Sessions       *game.SessionManager
 	Logger         *log.Logger
 	GetUnits       models.GameUnitsGet
 	AllowedOrigins []string
 }
+
+func (gs *GameWsService) sessions() *game.SessionManager {
+	if gs.Sessions != nil {
+		return gs.Sessions
+	}
+	return SessionManager
+}
+
 type functionResolver func(*realtime.WSConnection, realtime.ActionReceived) error
 
 func (gs *GameWsService) Receive(w http.ResponseWriter, r *http.Request) {
@@ -47,7 +63,7 @@ func (gs *GameWsService) Receive(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 	defer func() {
-		if session := SessionManager.FindSessionByConn(conn); session != nil {
+		if session := gs.sessions().FindSessionByConn(conn); session != nil {
 			session.Disconnect(conn, false)
 		}
 	}()
@@ -58,11 +74,16 @@ func (gs *GameWsService) Receive(w http.ResponseWriter, r *http.Request) {
 		joinGame:    receiveAction(gs.joinGame),
 		movePiece:   receiveAction(gs.movePiece),
 		attackPiece: receiveAction(gs.attack),
+		useAbility: receiveAction(func(conn *realtime.WSConnection, payload useAbilityAction) error {
+			return gs.inSession(conn, func(session *game.GameSession) error {
+				return session.UseAbility(conn.AccoID, payload.UnitID, payload.AbilityID, payload.To)
+			})
+		}),
 		endTurn: receiveAction(func(conn *realtime.WSConnection, _ struct{}) error {
 			return gs.inSession(conn, func(session *game.GameSession) error { return session.EndTurn(conn.AccoID) })
 		}),
 		leaveGame: receiveAction(func(conn *realtime.WSConnection, _ struct{}) error {
-			if session := SessionManager.FindSessionByConn(conn); session != nil {
+			if session := gs.sessions().FindSessionByConn(conn); session != nil {
 				session.Disconnect(conn, true)
 			}
 			return nil
@@ -93,16 +114,26 @@ func (gs *GameWsService) joinGame(conn *realtime.WSConnection, payload joinGameA
 	if err != nil || id == uuid.Nil {
 		return errors.New("conta deve ser um UUID válido")
 	}
-	if previous := SessionManager.FindSessionByConn(conn); previous != nil {
+	if previous := gs.sessions().FindSessionByConn(conn); previous != nil {
 		if previous.ID != payload.SessionID || conn.AccoID != id {
 			return errors.New("saia da partida atual antes de entrar em outra")
 		}
 	}
-	units, err := gs.GetUnits(id)
-	if err != nil {
-		return err
+	var units []models.Unit
+	existing, exists := gs.sessions().GetSession(payload.SessionID)
+	if !exists || !existing.HasPlayer(id) {
+		units, err = gs.GetUnits(id)
+		if err != nil {
+			return err
+		}
+		if payload.Team != nil {
+			units, err = ApplyTeamLoadout(units, payload.Team)
+			if err != nil {
+				return err
+			}
+		}
 	}
-	session := SessionManager.CreateSession(payload.SessionID)
+	session := gs.sessions().CreateSession(payload.SessionID)
 	if err := session.AddPlayer(conn, id, units); err != nil {
 		return err
 	}
@@ -113,7 +144,7 @@ func (gs *GameWsService) joinGame(conn *realtime.WSConnection, payload joinGameA
 	return nil
 }
 func (gs *GameWsService) inSession(conn *realtime.WSConnection, action func(*game.GameSession) error) error {
-	session := SessionManager.FindSessionByConn(conn)
+	session := gs.sessions().FindSessionByConn(conn)
 	if session == nil {
 		return errors.New("sessão não encontrada")
 	}

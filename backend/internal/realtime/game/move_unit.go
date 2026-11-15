@@ -33,6 +33,7 @@ func (s *GameSession) MovePiece(id uuid.UUID, unitID string, to models.Position)
 			return errors.New("stamina insuficiente")
 		}
 		unit.Path = append([]models.Position{unit.Position}, path...)
+		unit.MovementMode = ""
 		unit.Position = to
 		unit.CurrentStamina -= cost
 		s.changed()

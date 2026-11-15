@@ -21,11 +21,20 @@ npm install
 npm run dev
 ```
 
-O frontend lê a URL completa do WebSocket da variável `VITE_WS_URL`, configurada em `frontend/.env`.
+Configure as duas URLs separadamente em `frontend/.env` (use `frontend/.env.example` como referência):
+
+```dotenv
+VITE_API_URL=http://localhost:8080
+VITE_WS_URL=ws://localhost:8080/api/game-connect
+```
+
+`VITE_API_URL` define a origem HTTP/HTTPS das chamadas da API. `VITE_WS_URL` define a URL completa WS/WSS da conexão do jogo. Elas podem apontar para servidores diferentes. Reinicie o Vite após alterar as variáveis; em produção, gere um novo build. Para túneis ngrok, use `https://` na API e `wss://` no socket, e inclua a origem do frontend em `ALLOWED_ORIGINS` do backend.
+
+`ALLOWED_ORIGINS` em `backend/envs` aceita origens exatas e padrões como `https://*.ngrok-free.app`. Esse padrão já está configurado para permitir os endereços variáveis do ngrok, tanto no CORS HTTP quanto no WebSocket, sem cadastrar cada túnel novo. Reinicie o backend após alterar essa configuração. Se `ALLOWED_ORIGINS` também estiver definida no ambiente do processo, atualize esse valor: ele tem prioridade sobre o arquivo `envs`.
 
 ## Jogar
 
-1. Abra `/home` e gere uma conta de teste.
+1. Abra `/home`, monte as três unidades e gere uma conta de teste. Cada unidade recebe uma arma e até dois itens/habilidades, respeitando as penalidades da arma.
 2. Informe o nome da sessão e entre.
 3. Em outra aba, gere outra conta e entre na mesma sessão.
 4. No seu turno, selecione uma unidade. O hover mostra a rota e o clique envia o destino ao servidor.
@@ -55,7 +64,7 @@ O componente compartilhado `ProceduralMap` recebe as dimensões, os tiles e as u
 
 ## Laboratório de skills
 
-Abra `/skills-lab` pelo atalho na página inicial. Não é necessário criar conta ou entrar em uma partida. O backend precisa estar atualizado e em execução; as chamadas HTTP usam o mesmo servidor configurado em `VITE_WS_URL`.
+Abra `/skills-lab` pelo atalho na página inicial. Não é necessário criar conta ou entrar em uma partida. O backend precisa estar atualizado e em execução; as chamadas HTTP usam o servidor configurado em `VITE_API_URL`.
 
 - Escolha a arena de testes ou gere um mapa procedural por seed.
 - Use **+ Token** para adicionar unidades de duas equipes, escolhendo personagem, arma, vida e escudo.
@@ -88,9 +97,17 @@ No laboratório, clique em **Usar** na habilidade equipada. Escudo aplica 3 pont
 
 Granada permite escolher seu centro até dois terrenos adiante, na mesma linha ou coluna. O hover marca a área 3 × 3, recortada nas bordas do mapa. Todas as unidades vivas na área, incluindo a própria unidade e aliadas, recebem 2 de dano se estiverem sem escudo; quem tem escudo apenas perde a proteção, sem dano excedente à vida. O limite de uma granada vale para o cenário inteiro, independentemente da equipe ou unidade.
 
-`POST /api/skills-lab/ability` aplica os efeitos pelo ID de `Effect`, valida o cenário e retorna cópias do mapa, tokens e contadores. Alvos inválidos não consomem uso. As habilidades de uso único registram o consumo por unidade; trocar de habilidade, atacar, restaurar recursos ou recuperar estamina não renova esse uso. **Reiniciar cenário** ou gerar um novo mapa renova todos os usos. A ativação está conectada ao laboratório; o multiplayer ainda não possui comando de uso de habilidades.
+`POST /api/skills-lab/ability` aplica os efeitos pelo ID de `Effect`, valida o cenário e retorna cópias do mapa, tokens e contadores. Alvos inválidos não consomem uso. As habilidades de uso único registram o consumo por unidade; trocar de habilidade, atacar, restaurar recursos ou recuperar estamina não renova esse uso. **Reiniciar cenário** ou gerar um novo mapa renova todos os usos. A ativação também está disponível no multiplayer, pelo comando `useAbility`, com a mesma resolução de efeitos e validação de turno e propriedade da unidade.
 
 Casas, ruínas e barricadas bloqueiam a linha dos ataques diretos, tanto no multiplayer quanto no laboratório. Árvores e rochas não bloqueiam disparos. Uma unidade protegida por uma estrutura não aparece como alvo válido. Barricadas podem ser selecionadas diretamente em **Testar ataque** ou **Atacar**: um golpe as remove e libera o terreno, sem dano à unidade atrás delas. No multiplayer, destruir uma barricada consome o ataque do turno. Não é possível destruir uma barricada através de outra estrutura. A área da granada também destrói as barricadas que atingir; casas e ruínas permanecem no mapa.
+
+## Montagem da equipe
+
+A home consulta `GET /api/team-options` para obter armas, habilidades e recursos do servidor. Cada cartão permite selecionar uma arma e habilidades diferentes para a unidade, mostrando dano, alcance, efeitos e estamina efetiva. A penalidade de habilidades da arma reduz os slots disponíveis: escopeta, sniper e martelo permitem uma habilidade; pistola e katana permitem duas. Trocar de arma mantém apenas as habilidades que cabem no novo limite.
+
+O rascunho é salvo no `sessionStorage` da aba. Ao entrar, a formação também é salva por sessão e conta e enviada no campo `team` de `joinGame`. O servidor aceita somente IDs do catálogo, exige exatamente três unidades e valida duplicatas e limites; vida, escudo, estamina, dano e efeitos são sempre definidos pelo servidor. Links diretos sem seleção conservam a equipe padrão de três pistolas. Reentrar na mesma partida preserva a equipe confirmada, seus recursos e os usos consumidos, mesmo que outro equipamento seja enviado na reconexão.
+
+As habilidades equipadas aparecem no painel da unidade durante o combate. **Usar Escudo** aplica a proteção à própria unidade; as demais habilidades permitem selecionar o terreno alvo, com prévia da área da granada. Só é possível ativá-las no turno do dono e em unidades vivas que tenham a habilidade equipada. O combate e o laboratório compartilham a resolução dos efeitos em `backend/internal/realtime/game/ability_effects.go`. Usar uma habilidade não consome o ataque nem estamina, e finalizar o turno não renova usos únicos. A granada mantém o limite global de uma utilização por partida e pode eliminar unidades aliadas, inclusive encerrando a partida sem vencedor se eliminar ambos os times.
 
 ## Verificações
 

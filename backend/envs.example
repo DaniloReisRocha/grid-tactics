@@ -5,4 +5,4 @@ DB_NAME=lease_manager
 DB_HOST=localhost
 DB_PORT=5432
 JWT_SCECRET=your-256-bit-secret
-ALLOWED_ORIGINS=http://localhost:8080,http://localhost:5173
+ALLOWED_ORIGINS=http://localhost:8080,http://localhost:5173,https://*.ngrok-free.app

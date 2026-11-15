@@ -1,6 +1,8 @@
 import { useGameSocket } from "@/store/GameSocket";
 import { canUnitAttack } from "@/internal/game/combat";
 import { effectiveStamina } from "@/internal/game/stamina";
+import { combatSkillToken,labAbilityProblem } from "@/internal/game/abilities";
+import { EffectID } from "@/internal/game/effects";
 import "@/styles/game/PieceInfoPanel.css";
 
 export const PieceInfoPanel = () => {
@@ -15,6 +17,7 @@ export const PieceInfoPanel = () => {
     status,
     pending,
     connection,
+    board,matchAbilityUses,skillMode,setSkillMode,activateAbility,
   } = useGameSocket();
   const units = Object.values(players).flatMap((player) => player.units);
   const selected = units.find((unit) => unit.unit.id === unitID);
@@ -25,6 +28,7 @@ export const PieceInfoPanel = () => {
     !pending &&
     connection === "connected";
   const weapon = selected?.unit.weapons[0];
+  const tokens=units.map(combatSkillToken);
 
   return (
     <aside className="unit-info-panel">
@@ -62,6 +66,20 @@ export const PieceInfoPanel = () => {
                 ? "Cancelar ataque"
                 : "Atacar"}
           </button>
+          <div style={{display:"grid",gap:8,marginTop:12,fontSize:13}}>
+            {(selected.unit.abilities??[]).map((ability)=>{
+              const problem=labAbilityProblem(combatSkillToken(selected),ability,board,tokens,matchAbilityUses??{});
+              return <div key={ability.id}>
+                <button type="button" disabled={!canAct||!!problem} title={problem??ability.description} aria-pressed={skillMode===ability.id}
+                  onClick={()=>{
+                    if(ability.effect.some((effect)=>effect.id===EffectID.grantShield))activateAbility(selected.unit.id,ability.id,selected.x,selected.y);
+                    else setSkillMode(skillMode===ability.id?null:ability.id);
+                  }}>{ability.icon} {skillMode===ability.id?"Cancelar": "Usar"} {ability.name}</button>
+                {problem?<small style={{display:"block"}}>{problem}</small>:null}
+              </div>;
+            })}
+            {skillMode?<small>Clique no terreno alvo para usar a habilidade.</small>:null}
+          </div>
         </div>
       ) : (
         <p>Selecione uma unidade no tabuleiro.</p>

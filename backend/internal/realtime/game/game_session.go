@@ -3,6 +3,7 @@ package game
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"math/rand"
 	"sync"
 	"time"
@@ -20,28 +21,37 @@ type PlayerState struct {
 }
 
 type GameSession struct {
-	ID             string
-	maximumPlayers int
-	spawnSlots     []models.Position
-	Players        map[uuid.UUID]*PlayerState
-	Board          []models.Cell
-	TurnOrder      []uuid.UUID
-	CurrentTurn    *uuid.UUID
-	TurnCounter    int
-	Status         string
-	Winner         *uuid.UUID
-	Revision       uint64
-	StartedAt      time.Time
-	LastAction     time.Time
-	lock           *sync.RWMutex
+	ID               string
+	maximumPlayers   int
+	spawnSlots       []models.Position
+	Players          map[uuid.UUID]*PlayerState
+	Board            []models.Cell
+	TurnOrder        []uuid.UUID
+	CurrentTurn      *uuid.UUID
+	TurnCounter      int
+	Status           string
+	Winner           *uuid.UUID
+	Revision         uint64
+	MatchAbilityUses map[string]int
+	StartedAt        time.Time
+	LastAction       time.Time
+	lock             *sync.RWMutex
 }
 
 func NewGameSession(id string, maximumPlayers int) *GameSession {
 	return &GameSession{
 		ID: id, maximumPlayers: maximumPlayers, Players: make(map[uuid.UUID]*PlayerState),
 		Board: generateBoard(id, 15, 15), TurnOrder: []uuid.UUID{}, Status: "waiting",
-		StartedAt: time.Now(), LastAction: time.Now(), lock: &sync.RWMutex{},
+		MatchAbilityUses: map[string]int{},
+		StartedAt:        time.Now(), LastAction: time.Now(), lock: &sync.RWMutex{},
 	}
+}
+
+func (s *GameSession) HasPlayer(id uuid.UUID) bool {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	_, exists := s.Players[id]
+	return exists
 }
 
 func (s *GameSession) changed() { s.Revision++; s.LastAction = time.Now() }
@@ -54,6 +64,9 @@ func (s *GameSession) BroadcastState() error {
 	for id, p := range s.Players {
 		copyPlayer := p.Player
 		copyPlayer.Units = append([]models.UnitInstance{}, p.Units...)
+		for i := range copyPlayer.Units {
+			copyPlayer.Units[i].AbilityUses = maps.Clone(copyPlayer.Units[i].AbilityUses)
+		}
 		players[id] = &copyPlayer
 		if p.Connection != nil {
 			connections = append(connections, p.Connection)
@@ -72,6 +85,7 @@ func (s *GameSession) BroadcastState() error {
 		ID: s.ID, Players: players, Board: append([]models.Cell{}, s.Board...),
 		TurnOrder: append([]uuid.UUID{}, s.TurnOrder...), CurrentTurn: turn,
 		TurnCounter: s.TurnCounter, Status: s.Status, Winner: winner, Revision: s.Revision,
+		MatchAbilityUses: maps.Clone(s.MatchAbilityUses),
 	}
 	s.lock.RUnlock()
 	var failures []error
