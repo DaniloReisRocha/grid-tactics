@@ -28,6 +28,16 @@ test("HTTP API uses its own URL independently of the WebSocket host", () => {
   assert.equal(backendURL("/api/skills-lab").href, "https://api.example.test/api/skills-lab");
 });
 
+test("orbs loop only spawn frames and finish their burst exactly once", () => {
+  const {orbFrame} = compile("components/ProceduralMap/orbAnimation.ts");
+  for (const [elapsed,expected] of [[0,2],[180,3],[360,4],[540,3],[720,2],[1440,2]]) {
+    assert.equal(orbFrame(elapsed,false),expected);
+  }
+  for (const [elapsed,expected] of [[0,5],[119,5],[120,6],[240,7],[360,8],[480,9],[599,9],[600,null],[1200,null]]) {
+    assert.equal(orbFrame(elapsed,true),expected);
+  }
+});
+
 test("opposite camera reverses depth and projection on rectangular maps without mutating world coordinates", () => {
   const { viewPosition, projectPosition, viewDepth } = compile("components/ProceduralMap/projection.ts");
   const normal = { width: 9, height: 5, reversed: false };
@@ -129,6 +139,26 @@ test("passive shields apply on lab equipment once and cannot refill after damage
   const unequipped = applyPassiveAbilities({...damaged,abilityIDs:[]},[ability]);
   assert.equal(applyPassiveAbilities({...unequipped,abilityIDs:["shield"]},[ability]).shield,0);
   assert.equal(applyPassiveAbilities({...token,life:0},[ability]).shield,0);
+});
+
+test("orbs restore ability allowances and equipped passives without altering combat resources", () => {
+  const {restoreOrbAbilities,labAbilityProblem} = compile("internal/game/abilities.ts");
+  const shield = {id:"shield",passive:true,shield:3,effect:[{id:"grantShield"}]};
+  const grenade = {id:"grenade",maxUsesPerMatch:1,effect:[]};
+  const original = {id:"collector",life:2,maxLife:3,shield:0,maxShield:3,staminaSpent:4,turnCount:3,
+    weaponID:"sniper",abilityIDs:["shield","grenade"],abilityUses:{shield:1,grenade:1,barricade:3,trampoline:1},path:[]};
+  const restored = restoreOrbAbilities(original,[shield,grenade]);
+  assert.equal(restored.shield,3);
+  assert.equal(restored.abilityUses.shield,1);
+  for (const id of ["grenade","barricade","trampoline"]) assert.equal(restored.abilityUses[id]??0,0);
+  assert.equal(labAbilityProblem(restored,grenade,[],[restored],{grenade:10}),null);
+  for (const key of ["life","maxLife","staminaSpent","turnCount","weaponID"]) assert.equal(restored[key],original[key]);
+  assert.equal(original.shield,0);
+  assert.equal(original.abilityUses.grenade,1);
+  const noShield = restoreOrbAbilities({...original,abilityIDs:["grenade"]},[shield,grenade]);
+  assert.equal(noShield.shield,0);
+  const dead = {...original,life:0};
+  assert.equal(restoreOrbAbilities(dead,[shield,grenade]),dead);
 });
 
 test("ability previews enforce usage, cardinal targets, height, and the grenade area", () => {

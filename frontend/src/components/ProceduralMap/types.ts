@@ -1,6 +1,7 @@
 import type { MapTile } from "./generator";
 
 export type CharacterModel = 0 | 1 | 2;
+export interface MapOrb { id: string; x: number; y: number; triggered: boolean }
 export interface MapActor {
   id: string;
   tile: MapTile;
@@ -15,6 +16,7 @@ export interface MapActor {
   movementMode?: "jump" | "";
 }
 export interface MapInteraction {
+  onActorTileEnter?: (tile: MapTile, actorID: string) => void;
   path: readonly { x: number; y: number }[];
   area?: readonly { x: number; y: number }[];
   selectable: ReadonlySet<string>;

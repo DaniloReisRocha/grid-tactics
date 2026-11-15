@@ -68,6 +68,7 @@ Abra `/skills-lab` pelo atalho na página inicial. Não é necessário criar con
 
 - Escolha a arena de testes ou gere um mapa procedural por seed.
 - Use **+ Token** para adicionar unidades de duas equipes, escolhendo personagem, arma, vida e escudo.
+- Use **+ Orb** para posicionar orbs manualmente em terrenos acessíveis e livres. Os frames 2–4 de `Explosion_5` ficam em loop; quando um personagem chega ao slot, inclusive durante uma rota com vários passos, a orb renova os usos das habilidades daquela unidade e reaplica suas passivas, restaurando o Escudo quando equipado. Vida, estamina e recarga da arma são preservadas. Os frames 5–9 são reproduzidos uma vez e a orb desaparece; cada orb só pode ser coletada uma vez. A ferramenta **Remover** também remove orbs, e reiniciar ou gerar outro cenário limpa todas elas.
 - Em **Selecionar / mover**, selecione uma unidade e clique em um destino. O hover mostra a rota, com movimento limitado à estamina disponível após a penalidade da arma. Mover consome o custo da rota; o botão **Recuperar estamina** restaura até o máximo efetivo.
 - Equipe uma das cinco armas e use **Testar ataque**. Os alvos válidos ficam destacados; ataques só atingem a mesma linha ou coluna do atacante. A escopeta quebra o escudo; o sniper não atinge adjacentes; katana e martelo exigem o mesmo nível; o martelo empurra quando o destino permite.
 - Use **Editar terreno** para pintar slots vazios com grama, terra, água, casas, árvores ou rochas, nos níveis de 0 a 3.

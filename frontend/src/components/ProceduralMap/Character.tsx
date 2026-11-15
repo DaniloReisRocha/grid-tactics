@@ -19,6 +19,7 @@ interface CharacterProps {
   onElevation?: (height: number) => void;
   jump?: boolean;
   activeTurn?: boolean;
+  onTileEnter?: (tile: MapTile) => void;
 }
 
 const FRAME_WIDTH = 16;
@@ -38,7 +39,7 @@ function project(tile: MapTile, view: MapView) {
   };
 }
 
-export default function Character({ spawn, path, view, onError, model = 2, onSelect, onHover, onSprite, onElevation, jump = false, activeTurn = false }: CharacterProps) {
+export default function Character({ spawn, path, view, onError, model = 2, onSelect, onHover, onSprite, onElevation, jump = false, activeTurn = false, onTileEnter }: CharacterProps) {
   const spriteRef = useRef<Sprite>(null);
   const registerSprite = useCallback((sprite: Sprite | null) => {
     spriteRef.current = sprite;
@@ -89,8 +90,10 @@ export default function Character({ spawn, path, view, onError, model = 2, onSel
       }
     }
     state.clock += delta;
+    const previousElapsed = state.elapsed;
     state.elapsed = Math.min(STEP_MS, state.elapsed + delta);
     if (state.elapsed >= STEP_MS) {
+      if (previousElapsed < STEP_MS) onTileEnter?.(state.to);
       const next = pending.current.shift();
       if (next) {
         const dx = next.x - state.to.x;

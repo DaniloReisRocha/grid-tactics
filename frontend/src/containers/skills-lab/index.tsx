@@ -3,22 +3,23 @@ import { Link } from "react-router-dom";
 import ProceduralMap from "@/components/ProceduralMap";
 import { isWalkable } from "@/components/ProceduralMap/characterMovement";
 import type { MapTile } from "@/components/ProceduralMap/generator";
-import type { CharacterModel, MapActor } from "@/components/ProceduralMap/types";
+import type { CharacterModel, MapActor, MapOrb } from "@/components/ProceduralMap/types";
 import { attackInLab, activateAbilityInLab, loadLab, type LabConfig, type LabLayout, type SkillToken } from "@/api/skillsLab";
 import { movementOptions, positionKey } from "@/internal/game/pathfinding";
 import { labAttackProblem, labMovementUnit, labStamina, starterTokens } from "@/internal/game/skillsLab";
 import { effectiveStamina } from "@/internal/game/stamina";
-import { labAbilityProblem, abilityArea, applyPassiveAbilities } from "@/internal/game/abilities";
+import { labAbilityProblem, abilityArea, applyPassiveAbilities, restoreOrbAbilities } from "@/internal/game/abilities";
 import { EffectID, weaponReloading } from "@/internal/game/effects";
 import AbilitySelector from "./AbilitySelector";
 import "./styles.css";
 
-type Tool = "select" | "add" | "attack" | "remove" | "paint" | "skill";
+type Tool = "select" | "add" | "attack" | "remove" | "paint" | "skill" | "orb";
 const TOOLS: { id: Tool; label: string; hint: string }[] = [
   { id: "select", label: "Selecionar / mover", hint: "Selecione um token. Passe o mouse para ver a rota e clique em um slot para mover." },
   { id: "add", label: "+ Token", hint: "Escolha equipe, personagem e arma. Clique em um slot livre para adicionar." },
+  { id: "orb", label: "+ Orb", hint: "Adicione uma orb em um terreno livre. Ao passar por ela, a unidade recupera os usos das habilidades e os efeitos passivos." },
   { id: "attack", label: "Testar ataque", hint: "Clique em um alvo da outra equipe. Os alvos válidos estão marcados em vermelho." },
-  { id: "remove", label: "Remover token", hint: "Clique em um token ou caveira para remover do cenário." },
+  { id: "remove", label: "Remover", hint: "Clique em um token, caveira ou orb para remover do cenário." },
   { id: "paint", label: "Editar terreno", hint: "Escolha o terreno e a altura. Clique em um slot sem tokens para pintar." },
 ];
 const TEAMS = ["#68d2ff", "#ffcc66"];
@@ -27,6 +28,10 @@ const errorText = (error: unknown) => error instanceof Error ? error.message : "
 export default function SkillsLab() {
   const [config, setConfig] = useState<LabConfig | null>(null);
   const [tokens, setTokens] = useState<SkillToken[]>([]);
+  const [orbs, setOrbs] = useState<MapOrb[]>([]);
+  const collectedOrbs = useRef(new Set<string>());
+  const orbRevision = useRef(0);
+  const unitOrbRevision = useRef(new Map<string, number>());
   const [selectedID, setSelectedID] = useState<string | null>(null);
   const [tool, setTool] = useState<Tool>("select");
   const [hovered, setHovered] = useState<MapTile | null>(null);
@@ -62,6 +67,8 @@ export default function SkillsLab() {
       const starters = starterTokens(data.board, data.weapons);
       initial.current = structuredClone({ config: data, tokens: starters });
       setConfig(data); setTokens(starters); setSelectedID(starters[0]?.id ?? null);
+      setOrbs([]);
+      collectedOrbs.current.clear(); unitOrbRevision.current.clear(); orbRevision.current = 0;
       setWeaponID(data.weapons[0]?.id ?? "pistol"); setTool("select");
       setAbilityIDs([]);
       setActiveAbilityID(null); setMatchAbilityUses({});
@@ -80,6 +87,19 @@ export default function SkillsLab() {
   const board = useMemo(() => config?.board ?? [], [config]);
   const weapons = useMemo(() => config?.weapons ?? [], [config]);
   const abilities = config?.abilities ?? [];
+  const triggerOrb = (tile: MapTile, actorID: string) => {
+    const orb = orbs.find((item) => !item.triggered && item.x === tile.x && item.y === tile.y && !collectedOrbs.current.has(item.id));
+    if (!orb) return;
+    collectedOrbs.current.add(orb.id);
+    unitOrbRevision.current.set(actorID, ++orbRevision.current);
+    setOrbs((items) => items.map((item) => item.id === orb.id ? {...item, triggered: true} : item));
+    setTokens((items) => items.map((token) => token.id === actorID ? restoreOrbAbilities(token, abilities) : token));
+    setLog((items) => ["Orb coletada: habilidades e efeitos passivos da unidade recuperados.", ...items].slice(0, 20));
+  };
+  // An HTTP action may finish after a visual movement collects an orb. Preserve
+  // that recovery when applying the response, without changing other units.
+  const preserveOrbRecoveries = (items: SkillToken[], requestRevision: number) => items.map((token) =>
+    (unitOrbRevision.current.get(token.id) ?? 0) > requestRevision ? restoreOrbAbilities(token, abilities) : token);
   const activeAbility = abilities.find((ability) => ability.id === activeAbilityID);
   const baseStamina = config?.baseStamina ?? 5;
   const selected = tokens.find((token) => token.id === selectedID);
@@ -104,7 +124,8 @@ export default function SkillsLab() {
     const key = positionKey(tile);
     if ((tool === "paint" && !occupied.has(key))
       || (tool === "add" && isWalkable(tile) && !occupied.has(key))
-      || (tool === "remove" && occupied.has(key))
+      || (tool === "orb" && isWalkable(tile) && !occupied.has(key) && !orbs.some((orb) => positionKey(orb) === key))
+      || (tool === "remove" && (occupied.has(key) || orbs.some((orb) => positionKey(orb) === key)))
       || (tool === "select" && (occupied.has(key) || movement?.paths.has(key)))
       || (tool === "skill" && !labAbilityProblem(selected, activeAbility, board, tokens, matchAbilityUses, tile))
       || (tool === "attack" && attackTargets.has(key))) selectable.add(key);
@@ -124,13 +145,14 @@ export default function SkillsLab() {
     const ability = abilities.find((item) => item.id === id);
     const problem = labAbilityProblem(selected, ability, board, tokens, matchAbilityUses, target);
     if (problem) { setError(problem); return; }
+    const requestOrbRevision = orbRevision.current;
     const controller = new AbortController(); activeRequest.current = controller;
     busy.current = true; setPending(true); setError(null);
     try {
       const result = await activateAbilityInLab(board,tokens,selected.id,id,target,matchAbilityUses,controller.signal);
       if (!controller.signal.aborted) {
         setConfig((current) => current ? {...current,board:result.board} : current);
-        setTokens(result.tokens); setMatchAbilityUses(result.matchAbilityUses); addLog(result.message);
+        setTokens(preserveOrbRecoveries(result.tokens, requestOrbRevision)); setMatchAbilityUses(result.matchAbilityUses); addLog(result.message);
         setActiveAbilityID(null); setTool("select"); setHovered(null);
       }
     } catch (cause) { if (!controller.signal.aborted) setError(errorText(cause)); }
@@ -151,22 +173,29 @@ export default function SkillsLab() {
     setError(null);
     const key = positionKey(tile);
     const token = tokens.find((item) => item.life > 0 && positionKey(item) === key) ?? occupied.get(key);
+    if (tool === "orb") {
+      if (!isWalkable(tile) || occupied.has(key) || orbs.some((orb) => positionKey(orb) === key)) { setError("Adicione a orb em um terreno acessível e livre."); return; }
+      setOrbs((items) => [...items, {id:crypto.randomUUID(),x:tile.x,y:tile.y,triggered:false}]);
+      return;
+    }
     if (tool === "skill" && activeAbilityID) { await performAbility(activeAbilityID,tile); return; }
     if (tool === "attack") {
       if (!selected) { setError("Selecione o atacante na lista de tokens."); return; }
       const problem = labAttackProblem(selected, token, board, weapons,tile);
       if (problem) { setError(problem); return; }
+      const requestOrbRevision = orbRevision.current;
       const controller = new AbortController();
       activeRequest.current = controller; busy.current = true; setPending(true);
       try {
         const result = await attackInLab(board, tokens, selected.id, token?.id, controller.signal,tile);
-        if (!controller.signal.aborted) { setTokens(result.tokens); setConfig((current)=>current?{...current,board:result.board}:current); addLog(result.message); }
+        if (!controller.signal.aborted) { setTokens(preserveOrbRecoveries(result.tokens, requestOrbRevision)); setConfig((current)=>current?{...current,board:result.board}:current); addLog(result.message); }
       } catch (cause) { if (!controller.signal.aborted) setError(errorText(cause)); }
       finally { if (activeRequest.current === controller) { busy.current = false; setPending(false); } }
       return;
     }
     if (tool === "remove") {
       if (token) { setTokens((items) => items.filter((item) => item.id !== token.id)); if (token.id === selectedID) setSelectedID(null); }
+      else setOrbs((items) => items.filter((orb) => positionKey(orb) !== key));
       return;
     }
     if (tool === "add") {
@@ -175,6 +204,7 @@ export default function SkillsLab() {
       const next: SkillToken = { id: crypto.randomUUID(), x: tile.x, y: tile.y, team, model, weaponID,
         life, maxLife: life, shield, maxShield: shield, abilityIDs: [...abilityIDs], staminaSpent: 0, path: [], turnCount: 1 };
       setTokens((items) => [...items, applyPassiveAbilities(next, abilities)]); setSelectedID(next.id);
+      triggerOrb(tile, next.id);
       addLog(`Token da equipe ${team + 1} adicionado em (${tile.x}, ${tile.y}).`);
       return;
     }
@@ -184,6 +214,7 @@ export default function SkillsLab() {
         height, elevation: height, object: terrain === "house" || terrain === "tree" || terrain === "rock" ? terrain : undefined,
         roof: terrain === "house" ? "roofPurple" : undefined };
       setConfig({ ...config, board: board.map((cell) => positionKey(cell) === key ? painted : cell) });
+      if (!isWalkable(painted)) setOrbs((items) => items.filter((orb) => positionKey(orb) !== key));
       return;
     }
     if (token && token.life > 0) { chooseToken(token); return; }
@@ -231,6 +262,8 @@ export default function SkillsLab() {
     setVersion((value) => value + 1); setError(null); addLog("Vida, escudo e estamina restaurados.");
   };
   const reset = () => {
+    setOrbs([]);
+    collectedOrbs.current.clear(); unitOrbRevision.current.clear(); orbRevision.current = 0;
     if (!initial.current) return;
     const snapshot = structuredClone(initial.current);
     setConfig(snapshot.config); setTokens(snapshot.tokens); setSelectedID(snapshot.tokens[0]?.id ?? null);
@@ -258,8 +291,9 @@ export default function SkillsLab() {
               onClick={() => { setTool(item.id); setHovered(null); setError(null); }}>{item.label}</button>)}
           </div>
           <p className="lab-hint" role="status">{pending ? "Preparando o teste…" : tool === "skill" ? `${activeAbility?.name}: clique no terreno alvo. Os destinos válidos estão destacados ao passar o mouse; a granada mostra a área da explosão.` : TOOLS.find((item) => item.id === tool)?.hint}</p>
-          {config ? <ProceduralMap key={version} width={15} height={15} tiles={board} actors={actors} className="lab-map"
-            interaction={{ selectable, attackTargets, onHover: setHovered, onSelect: (tile) => { void onSelect(tile); },
+          {config ? <ProceduralMap key={version} width={15} height={15} tiles={board} actors={actors} orbs={orbs} className="lab-map"
+            onOrbComplete={(id) => setOrbs((items) => items.filter((orb) => orb.id !== id))}
+            interaction={{ selectable, attackTargets, onHover: setHovered, onActorTileEnter: triggerOrb, onSelect: (tile) => { void onSelect(tile); },
               area: tool === "skill" && hovered && selectable.has(positionKey(hovered)) ? abilityArea(activeAbility,hovered,board) : [],
               path: selected && preview ? [{ x: selected.x, y: selected.y }, ...preview] : [] }} />
             : <div className="lab-placeholder">{pending ? "Carregando o mapa e o catálogo de armas…" : "Use Gerar cenário para tentar novamente."}</div>}

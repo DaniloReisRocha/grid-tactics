@@ -60,3 +60,8 @@ export function applyPassiveAbilities(token: SkillToken, abilities: readonly Abi
   }
   return result;
 }
+
+export function restoreOrbAbilities(token: SkillToken, abilities: readonly Ability[]): SkillToken {
+  if (token.life <= 0) return token;
+  return applyPassiveAbilities({...token, abilityUses: {}}, abilities);
+}

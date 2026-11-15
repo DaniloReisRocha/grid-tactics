@@ -3,8 +3,9 @@ import { Application, extend } from "@pixi/react";
 import { Assets, Container, Graphics, Polygon, Sprite, type FederatedPointerEvent, type Texture } from "pixi.js";
 import Minimap from "./Minimap";
 import MapActorRenderer from "./MapActor";
+import Orb from "./Orb";
 import StructureOcclusion, { type OccludingStructure } from "./StructureOcclusion";
-import type { MapActor, MapInteraction } from "./types";
+import type { MapActor, MapInteraction, MapOrb } from "./types";
 import { tileKey } from "./characterMovement";
 import { projectPosition, viewDepth } from "./projection";
 import {
@@ -23,6 +24,7 @@ import {
 extend({ Container, Graphics, Sprite });
 
 const EMPTY_ACTORS: readonly MapActor[] = [];
+const EMPTY_ORBS: readonly MapOrb[] = [];
 
 export interface ProceduralMapProps {
   /** Number of columns, in tiles. */
@@ -32,6 +34,8 @@ export interface ProceduralMapProps {
   /** Authoritative terrain generated and validated by the server. */
   tiles: readonly MapTile[];
   actors?: readonly MapActor[];
+  orbs?: readonly MapOrb[];
+  onOrbComplete?: (id: string) => void;
   interaction?: MapInteraction;
   /** Show the top-down overview in the corner. */
   showMinimap?: boolean;
@@ -47,6 +51,8 @@ export default function ProceduralMap({
   height,
   tiles: providedTiles,
   actors = EMPTY_ACTORS,
+  orbs = EMPTY_ORBS,
+  onOrbComplete,
   interaction,
   showMinimap = true,
   className,
@@ -266,10 +272,16 @@ export default function ProceduralMap({
                 view={view}
                 onSelect={interaction?.onSelect}
                 onHover={(tile) => { setHover(tile ? { tiles, tile } : null); interaction?.onHover(tile); }}
+                onTileEnter={interaction?.onActorTileEnter}
                 onSelectedSprite={registerSelectedSprite}
                 onSelectedElevation={registerSelectedElevation}
                 onError={reportCharacterError} />
             ))}
+            {orbs.map((orb) => {
+              const tile = providedTiles.find((cell) => cell.x === orb.x && cell.y === orb.y);
+              return tile ? <Orb key={orb.id} tile={tile} triggered={orb.triggered} view={view}
+                onComplete={() => onOrbComplete?.(orb.id)} onError={reportCharacterError} /> : null;
+            })}
             <StructureOcclusion structures={structures} selectedSprite={selectedSprite} selectedElevation={selectedElevation} />
           </pixiContainer>
         ) : null}

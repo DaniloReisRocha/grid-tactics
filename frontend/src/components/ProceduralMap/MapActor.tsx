@@ -7,11 +7,12 @@ import type { MapActor as Actor } from "./types";
 import type { Sprite } from "pixi.js";
 import type { MapView } from "./projection";
 
-export default function MapActor({ actor, view, onSelect, onHover, onError, onSelectedSprite, onSelectedElevation }: {
+export default function MapActor({ actor, view, onSelect, onHover, onError, onSelectedSprite, onSelectedElevation, onTileEnter }: {
   actor: Actor;
   view: MapView;
   onSelect?: (tile: MapTile) => void;
   onHover?: (tile: MapTile | null) => void;
+  onTileEnter?: (tile: MapTile, actorID: string) => void;
   onError: () => void;
   onSelectedSprite: (sprite: Sprite | null) => void;
   onSelectedElevation: (height: number) => void;
@@ -41,6 +42,7 @@ export default function MapActor({ actor, view, onSelect, onHover, onError, onSe
           view={view}
           jump={actor.movementMode === "jump"}
           activeTurn={actor.activeTurn}
+          onTileEnter={(tile) => onTileEnter?.(tile, actor.id)}
           spawn={initialTile.current} path={path} model={actor.model}
           onError={onError}
           onSprite={actor.selected ? onSelectedSprite : undefined}
