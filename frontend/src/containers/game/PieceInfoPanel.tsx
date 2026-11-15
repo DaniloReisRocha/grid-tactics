@@ -1,5 +1,6 @@
 import { useGameSocket } from "@/store/GameSocket";
 import { canUnitAttack } from "@/internal/game/combat";
+import { effectiveStamina } from "@/internal/game/stamina";
 import "@/styles/game/PieceInfoPanel.css";
 
 export const PieceInfoPanel = () => {
@@ -38,7 +39,7 @@ export const PieceInfoPanel = () => {
             Escudo: {selected.currentShield}/{selected.unit.shield}
           </div>
           <div>
-            Stamina: {selected.currentStamina}/{selected.unit.stamina}
+            Stamina: {selected.currentStamina}/{effectiveStamina(selected.unit.stamina, selected.unit.weapons)}
           </div>
           <div>
             Ataques disponíveis neste turno: {selected.hasAttacked ? 0 : 1}

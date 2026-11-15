@@ -1,7 +1,7 @@
 import type { Cell, UnitInstance } from "@/api/models";
 import { weaponEffectProblem } from "./effects";
 
-/** Attack allowance is independent of movement stamina; staminaPenalty is ignored. */
+/** Attack allowance is independent of stamina; weapon penalties reduce movement capacity only. */
 export function canUnitAttack(unit: UnitInstance) {
   return (
     unit.currentLife > 0 && !unit.hasAttacked && unit.unit.weapons.length > 0

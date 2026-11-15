@@ -134,6 +134,7 @@ func (h *HTTPServer) Routes(authMiddleware *jwt.GinJWTMiddleware) []endpoint.API
 		// Stateless creative mode.
 		SkillsLabHandler{}.Config(),
 		SkillsLabHandler{}.Attack(),
+		SkillsLabHandler{}.Ability(),
 
 		// Example routes
 		exH.Create(),

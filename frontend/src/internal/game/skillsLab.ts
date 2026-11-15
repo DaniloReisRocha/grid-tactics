@@ -2,6 +2,7 @@ import type { Cell, UnitInstance, Weapon } from "@/api/models";
 import type { SkillToken } from "@/api/skillsLab";
 import { isWalkable } from "@/components/ProceduralMap/characterMovement";
 import { weaponEffectProblem } from "./effects";
+import { effectiveStamina } from "./stamina";
 
 export function labAttackProblem(attacker: SkillToken, target: SkillToken | undefined, board: Cell[], weapons: Weapon[]) {
   if (attacker.life <= 0) return "Escolha um atacante vivo.";
@@ -21,13 +22,20 @@ export function labAttackProblem(attacker: SkillToken, target: SkillToken | unde
 }
 
 // Adapt creative tokens to the same movement/path preview used in a real game.
-export function labMovementUnit(token: SkillToken, weapons: Weapon[]): UnitInstance {
+export function labStamina(token: SkillToken, weapons: Weapon[], baseStamina = 4) {
+  const equipped = weapons.filter((weapon) => weapon.id === token.weaponID);
+  const max = effectiveStamina(baseStamina, equipped);
+  return { max, current: Math.max(0, max - (token.staminaSpent ?? 0)) };
+}
+
+export function labMovementUnit(token: SkillToken, weapons: Weapon[], baseStamina = 4): UnitInstance {
   return {
     x: token.x, y: token.y, player: token.team, ownerID: String(token.team),
-    currentLife: token.life, currentShield: token.shield, currentStamina: 999,
+    currentLife: token.life, currentShield: token.shield, currentStamina: labStamina(token, weapons, baseStamina).current,
     hasAttacked: false, path: token.path,
-    unit: { id: token.id, lp: token.maxLife, shield: token.maxShield, stamina: 999,
-      icon: "", weapons: weapons.filter((weapon) => weapon.id === token.weaponID), tools: [] },
+    unit: { id: token.id, lp: token.maxLife, shield: token.maxShield, stamina: baseStamina,
+      icon: "", weapons: weapons.filter((weapon) => weapon.id === token.weaponID), tools: [],
+      itemSlots: 1, abilitySlots: 2, abilities: [] },
   };
 }
 
@@ -43,6 +51,6 @@ export function starterTokens(board: Cell[], weapons: Weapon[]): SkillToken[] {
   return chosen.map((tile, index) => ({
     id: `starter-${index + 1}`, x: tile.x, y: tile.y, team: index === 0 ? 0 : 1,
     model: index as 0 | 1 | 2, life: 6, shield: 3, maxLife: 6, maxShield: 3,
-    weaponID: weapons[0]?.id ?? "pistol", path: [],
+    weaponID: weapons[0]?.id ?? "pistol", abilityIDs: [], staminaSpent: 0, path: [],
   }));
 }

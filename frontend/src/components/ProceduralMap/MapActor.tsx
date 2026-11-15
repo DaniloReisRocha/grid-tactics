@@ -39,6 +39,7 @@ export default function MapActor({ actor, view, onSelect, onHover, onError, onSe
       ) : (
         <Character
           view={view}
+          jump={actor.movementMode === "jump"}
           spawn={initialTile.current} path={path} model={actor.model}
           onError={onError}
           onSprite={actor.selected ? onSelectedSprite : undefined}

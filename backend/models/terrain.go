@@ -9,15 +9,16 @@ const (
 )
 
 const (
-	ObjectNone     = ""
-	ObjectTree     = "tree"
-	ObjectForest   = "forest"
-	ObjectRock     = "rock"
-	ObjectRockDirt = "rockDirt"
-	ObjectHouse    = "house"
-	ObjectRuin     = "ruin"
-	ObjectBridgeX  = "bridgeX"
-	ObjectBridgeY  = "bridgeY"
+	ObjectNone      = ""
+	ObjectTree      = "tree"
+	ObjectForest    = "forest"
+	ObjectRock      = "rock"
+	ObjectRockDirt  = "rockDirt"
+	ObjectHouse     = "house"
+	ObjectRuin      = "ruin"
+	ObjectBridgeX   = "bridgeX"
+	ObjectBridgeY   = "bridgeY"
+	ObjectBarricade = "barricade"
 )
 
 const (

@@ -10,7 +10,7 @@ import (
 
 func testUnit(id string) models.Unit {
 	return models.Unit{ID: id, LP: 3, Shield: 3, Stamina: 6,
-		Weapons: []models.Weapon{{Name: "Pistola", Damage: 4, Range: 2, StaminaPenalty: 2}}}
+		Weapons: []models.Weapon{{Name: "Pistola", Damage: 4, Range: 2, StaminaPenalty: 0}}}
 }
 
 func startedSession(t *testing.T) (*GameSession, uuid.UUID, uuid.UUID) {
@@ -120,6 +120,8 @@ func TestAttackShieldLifeVictoryAndFriendlyFire(t *testing.T) {
 	s, a, b := startedSession(t)
 	s.Players[a].Units[0].Position = models.Position{}
 	s.Players[b].Units[0].Position = models.Position{X: 1}
+	// Explicitly grant a shield to exercise damage absorption; spawns have none.
+	s.Players[b].Units[0].CurrentShield = 3
 	if err := s.Attack(a, "a", models.Position{}); err == nil {
 		t.Fatal("friendly fire accepted")
 	}

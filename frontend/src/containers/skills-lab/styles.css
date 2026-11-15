@@ -28,6 +28,15 @@
 .lab-effects:empty { display: none; }
 .lab-effects [data-negative="true"] { color: #f5b3a3; }
 .lab-input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+.lab-skill-slots { display: grid; gap: 10px; }
+.lab-skill-actions { display: grid; gap: 8px; margin-top: 12px; }
+.lab-skill-actions button { width: 100%; }
+.lab-skill-actions small { display: block; margin-top: 4px; color: #b9cbbf; font-size: 11px; }
+.lab-skill-hint { margin: 0 0 12px; font-size: 12px; color: #aebfb5; }
+.lab-skill-stats { display: grid; gap: 4px; font-size: 12px; }
+.lab-skill-stats div { display: flex; justify-content: space-between; gap: 10px; }
+.lab-skill-stats dt { color: #aebfb5; }
+.lab-skill-stats dd { margin: 0; text-align: right; }
 .lab-card h2 { font-size: 14px; margin: 0 0 12px; }
 .lab-card-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .lab-card-heading h2 span { color: #96b6a1; font-weight: 400; }

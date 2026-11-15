@@ -5,13 +5,16 @@ import (
 )
 
 type Unit struct {
-	ID      string   `json:"id"`
-	LP      int      `json:"lp"`
-	Icon    string   `json:"icon"`
-	Shield  int      `json:"shield"`
-	Stamina int      `json:"stamina"`
-	Weapons []Weapon `json:"weapons"`
-	Tools   []string `json:"tools"`
+	ID           string    `json:"id"`
+	LP           int       `json:"lp"`
+	Icon         string    `json:"icon"`
+	Shield       int       `json:"shield"`
+	Stamina      int       `json:"stamina"`
+	Weapons      []Weapon  `json:"weapons"`
+	Tools        []string  `json:"tools"`
+	ItemSlots    int       `json:"itemSlots"`
+	AbilitySlots int       `json:"abilitySlots"`
+	Abilities    []Ability `json:"abilities"`
 }
 
 // services

@@ -25,7 +25,7 @@ func (s *GameSession) EndTurn(id uuid.UUID) error {
 		alive := false
 		for i := range p.Units {
 			if p.Units[i].CurrentLife > 0 {
-				p.Units[i].CurrentStamina = p.Units[i].Unit.Stamina
+				p.Units[i].CurrentStamina = p.Units[i].Unit.EffectiveStamina()
 				p.Units[i].HasAttacked = false
 				alive = true
 			}

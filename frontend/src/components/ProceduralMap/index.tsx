@@ -86,6 +86,7 @@ export default function ProceduralMap({
   const hoveredTile = hover?.tiles === tiles ? hover.tile : undefined;
   const highlightedPath = interaction?.path ?? [];
   const highlightedKeys = new Set(highlightedPath.map((tile) => tileKey(tile.x, tile.y)));
+  const areaKeys = new Set((interaction?.area ?? []).map((tile) => tileKey(tile.x, tile.y)));
   const destination = highlightedPath[highlightedPath.length - 1];
 
   const terrainCount = useMemo(() => {
@@ -181,6 +182,7 @@ export default function ProceduralMap({
               const markerY = surfaceY - 42 + (hasBridge(tile) ? -8 : 0);
               const isHovered = hoveredTile === tile;
               const isOnPath = highlightedKeys.has(tileKey(tile.x, tile.y));
+              const isInArea = areaKeys.has(tileKey(tile.x, tile.y));
               const selectable = interaction?.selectable.has(tileKey(tile.x, tile.y)) ?? false;
               const unreachable = isHovered && !selectable;
               const isDestination = destination?.x === tile.x && destination.y === tile.y;
@@ -222,11 +224,11 @@ export default function ProceduralMap({
                       />
                     );
                   })}
-                  {interaction && (isOnPath || isHovered || selectedActor || attackTarget) ? (
+                  {interaction && (isOnPath || isInArea || isHovered || selectedActor || attackTarget) ? (
                     <pixiGraphics
                       eventMode="none"
                       draw={(graphics) => {
-                        const color = unreachable || attackTarget ? 0xef6c67 : isDestination ? 0xffdc62 : selectedActor ? Number.parseInt(selectedActor.color.slice(1), 16) : 0x78dcb1;
+                        const color = isInArea ? 0xc49bff : unreachable || attackTarget ? 0xef6c67 : isDestination ? 0xffdc62 : selectedActor ? Number.parseInt(selectedActor.color.slice(1), 16) : 0x78dcb1;
                         graphics.clear();
                         graphics.poly([
                           0, markerY - TILE_HEIGHT / 2,

@@ -45,3 +45,22 @@ func (h SkillsLabHandler) Attack() endpoint.APIEndpoint {
 		}
 	}}
 }
+
+func (h SkillsLabHandler) Ability() endpoint.APIEndpoint {
+	return endpoint.APIEndpoint{NewEndpoint: func() (string, string, gin.HandlerFunc) {
+		return http.MethodPost, "/api/skills-lab/ability", func(c *gin.Context) {
+			c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20)
+			var input models.SkillsLabAbility
+			if err := c.ShouldBindJSON(&input); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "cenário inválido"})
+				return
+			}
+			result, err := service.ResolveSkillsLabAbility(input)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusOK, result)
+		}
+	}}
+}

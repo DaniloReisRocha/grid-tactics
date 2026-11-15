@@ -31,38 +31,21 @@ func SkillsLabConfig(seed, layout string) models.SkillsLabConfig {
 			}
 		}
 	}
-	return models.SkillsLabConfig{Board: board, Weapons: models.WeaponOptions()}
+	return models.SkillsLabConfig{Board: board, Weapons: models.WeaponOptions(), Abilities: models.AbilityOptions(), BaseStamina: models.UnitBaseStamina}
 }
 
 // ResolveSkillsLabAttack works on a copy of caller-supplied tokens, without a
 // session, turn allowance or stamina cost. Weapon data always comes from models.
 func ResolveSkillsLabAttack(input models.SkillsLabAttack) (models.SkillsLabResult, error) {
 	var result models.SkillsLabResult
-	if len(input.Board) == 0 || len(input.Board) > 1024 || len(input.Tokens) > 128 {
-		return result, errors.New("cenário inválido ou grande demais")
-	}
-	cells := make(map[models.Position]models.Cell, len(input.Board))
-	for _, cell := range input.Board {
-		position := models.Position{X: cell.X, Y: cell.Y}
-		if _, duplicate := cells[position]; duplicate || cell.X < 0 || cell.Y < 0 || cell.X >= 32 || cell.Y >= 32 || cell.Height < 0 || cell.Height > 3 {
-			return result, errors.New("terreno inválido")
-		}
-		cells[position] = cell
+	cells, err := validateLabScene(input.Board, input.Tokens)
+	if err != nil {
+		return result, err
 	}
 	attackerIndex, targetIndex := -1, -1
-	ids := map[string]bool{}
 	occupied := map[models.Position]bool{}
 	for i, token := range input.Tokens {
-		_, onBoard := cells[token.Position]
-		_, validWeapon := models.WeaponByID(token.WeaponID)
-		if token.ID == "" || ids[token.ID] || !onBoard || !validWeapon || token.Team < 0 || token.Team > 1 || token.Model < 0 || token.Model > 2 || token.Life < 0 || token.Life > 99 || token.Shield < 0 || token.Shield > 99 {
-			return result, errors.New("token inválido")
-		}
-		ids[token.ID] = true
 		if token.Life > 0 {
-			if occupied[token.Position] {
-				return result, errors.New("dois tokens vivos no mesmo slot")
-			}
 			occupied[token.Position] = true
 		}
 		if token.ID == input.AttackerID {
@@ -107,6 +90,7 @@ func ResolveSkillsLabAttack(input models.SkillsLabAttack) (models.SkillsLabResul
 		if destination, ok := game.WeaponKnockback(weapon, attacker.Position, target.Position, cells, occupied); ok {
 			defender.Position = destination
 			defender.Path = []models.Position{target.Position, destination}
+			defender.MovementMode = ""
 			result.Message += " Alvo empurrado um bloco."
 		} else {
 			result.Message += " Empurrão bloqueado pelo terreno, borda ou outro token."

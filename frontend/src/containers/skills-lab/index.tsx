@@ -4,12 +4,16 @@ import ProceduralMap from "@/components/ProceduralMap";
 import { isWalkable } from "@/components/ProceduralMap/characterMovement";
 import type { MapTile } from "@/components/ProceduralMap/generator";
 import type { CharacterModel, MapActor } from "@/components/ProceduralMap/types";
-import { attackInLab, loadLab, type LabConfig, type LabLayout, type SkillToken } from "@/api/skillsLab";
+import { attackInLab, activateAbilityInLab, loadLab, type LabConfig, type LabLayout, type SkillToken } from "@/api/skillsLab";
 import { movementOptions, positionKey } from "@/internal/game/pathfinding";
-import { labAttackProblem, labMovementUnit, starterTokens } from "@/internal/game/skillsLab";
+import { labAttackProblem, labMovementUnit, labStamina, starterTokens } from "@/internal/game/skillsLab";
+import { effectiveStamina } from "@/internal/game/stamina";
+import { labAbilityProblem, abilityArea } from "@/internal/game/abilities";
+import { EffectID } from "@/internal/game/effects";
+import AbilitySelector from "./AbilitySelector";
 import "./styles.css";
 
-type Tool = "select" | "add" | "attack" | "remove" | "paint";
+type Tool = "select" | "add" | "attack" | "remove" | "paint" | "skill";
 const TOOLS: { id: Tool; label: string; hint: string }[] = [
   { id: "select", label: "Selecionar / mover", hint: "Selecione um token. Passe o mouse para ver a rota e clique em um slot para mover." },
   { id: "add", label: "+ Token", hint: "Escolha equipe, personagem e arma. Clique em um slot livre para adicionar." },
@@ -31,6 +35,9 @@ export default function SkillsLab() {
   const [team, setTeam] = useState(0);
   const [model, setModel] = useState<CharacterModel>(0);
   const [weaponID, setWeaponID] = useState("pistol");
+  const [abilityIDs, setAbilityIDs] = useState<string[]>([]);
+  const [activeAbilityID, setActiveAbilityID] = useState<string | null>(null);
+  const [matchAbilityUses, setMatchAbilityUses] = useState<Record<string,number>>({});
   const [life, setLife] = useState(6);
   const [shield, setShield] = useState(3);
   const [terrain, setTerrain] = useState<"grass" | "dirt" | "water" | "house" | "tree" | "rock">("grass");
@@ -56,7 +63,9 @@ export default function SkillsLab() {
       initial.current = structuredClone({ config: data, tokens: starters });
       setConfig(data); setTokens(starters); setSelectedID(starters[0]?.id ?? null);
       setWeaponID(data.weapons[0]?.id ?? "pistol"); setTool("select");
-      setHovered(null); setVersion((value) => value + 1); setLog(["Cenário pronto. Ataques livres e movimento sem limite de estamina."]);
+      setAbilityIDs([]);
+      setActiveAbilityID(null); setMatchAbilityUses({});
+      setHovered(null); setVersion((value) => value + 1); setLog(["Cenário pronto. Ataques livres; movimento respeita a estamina e as penalidades da arma."]);
     } catch (cause) { if (!controller.signal.aborted) setError(errorText(cause)); }
     finally {
       if (activeRequest.current === controller) { busy.current = false; setPending(false); }
@@ -70,15 +79,19 @@ export default function SkillsLab() {
 
   const board = useMemo(() => config?.board ?? [], [config]);
   const weapons = useMemo(() => config?.weapons ?? [], [config]);
+  const abilities = config?.abilities ?? [];
+  const activeAbility = abilities.find((ability) => ability.id === activeAbilityID);
+  const baseStamina = config?.baseStamina ?? 4;
   const selected = tokens.find((token) => token.id === selectedID);
   const selectedWeapon = weapons.find((weapon) => weapon.id === selected?.weaponID);
+  const selectedStamina = selected ? labStamina(selected, weapons, baseStamina) : null;
   const lookup = useMemo(() => new Map(board.map((tile) => [positionKey(tile), tile])), [board]);
   const occupied = useMemo(() => new Map(tokens.map((token) => [positionKey(token), token])), [tokens]);
   const movement = useMemo(() => {
     if (!selected || selected.life <= 0 || tool !== "select") return null;
-    const units = tokens.map((token) => labMovementUnit(token, weapons));
-    return movementOptions(board, labMovementUnit(selected, weapons), units);
-  }, [selected, tokens, weapons, board, tool]);
+    const units = tokens.map((token) => labMovementUnit(token, weapons, baseStamina));
+    return movementOptions(board, labMovementUnit(selected, weapons, baseStamina), units);
+  }, [selected, tokens, weapons, board, tool, baseStamina]);
   const attackTargets = new Set<string>();
   if (tool === "attack" && selected) for (const target of tokens) {
     if (!labAttackProblem(selected, target, board, weapons)) attackTargets.add(positionKey(target));
@@ -90,23 +103,52 @@ export default function SkillsLab() {
       || (tool === "add" && isWalkable(tile) && !occupied.has(key))
       || (tool === "remove" && occupied.has(key))
       || (tool === "select" && (occupied.has(key) || movement?.paths.has(key)))
+      || (tool === "skill" && !labAbilityProblem(selected, activeAbility, board, tokens, matchAbilityUses, tile))
       || (tool === "attack" && attackTargets.has(key))) selectable.add(key);
   }
   const preview = tool === "select" && hovered ? movement?.paths.get(positionKey(hovered)) : undefined;
   const actors: MapActor[] = tokens.flatMap((token) => {
     const tile = lookup.get(positionKey(token));
     return tile ? [{ id: token.id, tile, path: token.path.map((point) => lookup.get(positionKey(point))).filter((point): point is MapTile => !!point),
-      model: token.model, color: TEAMS[token.team], life: token.life, shield: token.shield,
+      model: token.model, color: TEAMS[token.team], life: token.life, shield: token.shield, movementMode: token.movementMode,
       defeated: token.life <= 0, selected: token.id === selectedID && token.life > 0 }] : [];
   });
   const addLog = (message: string) => setLog((items) => [message, ...items].slice(0, 20));
-  const chooseToken = (token: SkillToken) => { setSelectedID(token.id); setWeaponID(token.weaponID); setError(null); };
+  const chooseToken = (token: SkillToken) => { setSelectedID(token.id); setWeaponID(token.weaponID); setActiveAbilityID(null); if (tool === "skill") setTool("select"); setError(null); };
+
+  const performAbility = async (id: string, target: MapTile) => {
+    if (busy.current || !config || !selected) return;
+    const ability = abilities.find((item) => item.id === id);
+    const problem = labAbilityProblem(selected, ability, board, tokens, matchAbilityUses, target);
+    if (problem) { setError(problem); return; }
+    const controller = new AbortController(); activeRequest.current = controller;
+    busy.current = true; setPending(true); setError(null);
+    try {
+      const result = await activateAbilityInLab(board,tokens,selected.id,id,target,matchAbilityUses,controller.signal);
+      if (!controller.signal.aborted) {
+        setConfig((current) => current ? {...current,board:result.board} : current);
+        setTokens(result.tokens); setMatchAbilityUses(result.matchAbilityUses); addLog(result.message);
+        setActiveAbilityID(null); setTool("select"); setHovered(null);
+      }
+    } catch (cause) { if (!controller.signal.aborted) setError(errorText(cause)); }
+    finally { if (activeRequest.current === controller) { busy.current = false; setPending(false); } }
+  };
+  const startAbility = (id: string) => {
+    if (!selected) return;
+    const ability = abilities.find((item) => item.id === id);
+    const problem = labAbilityProblem(selected,ability,board,tokens,matchAbilityUses);
+    if (problem) { setError(problem); return; }
+    if (ability?.effect.some((effect) => effect.id === EffectID.grantShield)) {
+      const tile = lookup.get(positionKey(selected)); if (tile) void performAbility(id,tile);
+    } else { setActiveAbilityID(id); setTool("skill"); setHovered(null); setError(null); }
+  };
 
   const onSelect = async (tile: MapTile) => {
     if (busy.current || !config) return;
     setError(null);
     const key = positionKey(tile);
     const token = tokens.find((item) => item.life > 0 && positionKey(item) === key) ?? occupied.get(key);
+    if (tool === "skill" && activeAbilityID) { await performAbility(activeAbilityID,tile); return; }
     if (tool === "attack") {
       if (!selected) { setError("Selecione o atacante na lista de tokens."); return; }
       const problem = labAttackProblem(selected, token, board, weapons);
@@ -128,7 +170,7 @@ export default function SkillsLab() {
       if (!isWalkable(tile) || occupied.has(key)) { setError("Adicione o token em um terreno acessível e livre."); return; }
       if (tokens.length >= 128) { setError("Limite de 128 tokens por cenário."); return; }
       const next: SkillToken = { id: crypto.randomUUID(), x: tile.x, y: tile.y, team, model, weaponID,
-        life, maxLife: life, shield, maxShield: shield, path: [] };
+        life, maxLife: life, shield, maxShield: shield, abilityIDs: [...abilityIDs], staminaSpent: 0, path: [] };
       setTokens((items) => [...items, next]); setSelectedID(next.id);
       addLog(`Token da equipe ${team + 1} adicionado em (${tile.x}, ${tile.y}).`);
       return;
@@ -143,9 +185,10 @@ export default function SkillsLab() {
     }
     if (token && token.life > 0) { chooseToken(token); return; }
     const path = movement?.paths.get(key);
-    if (selected && path?.length) {
+    const cost = movement?.costs.get(key);
+    if (selected && path?.length && cost !== undefined) {
       setTokens((items) => items.map((item) => item.id === selected.id
-        ? { ...item, x: tile.x, y: tile.y, path: [{ x: item.x, y: item.y }, ...path] } : item));
+        ? { ...item, x: tile.x, y: tile.y, movementMode: "", staminaSpent: (item.staminaSpent ?? 0) + cost, path: [{ x: item.x, y: item.y }, ...path] } : item));
     }
   };
 
@@ -154,20 +197,35 @@ export default function SkillsLab() {
     if (selected && tool !== "add") setTokens((items) => items.map((token) => token.id === selected.id ? { ...token, weaponID: id } : token));
     setError(null);
   };
+  const equipAbility = (slot: number, id: string) => {
+    setActiveAbilityID(null); if (tool === "skill") setTool("select");
+    const current = tool === "add" ? abilityIDs : selected?.abilityIDs ?? [];
+    if (id && (!abilities.some((ability) => ability.id === id) || current.some((item, index) => index !== slot && item === id))) return;
+    const next = [current[0] ?? "", current[1] ?? ""];
+    next[slot] = id;
+    if (tool === "add") setAbilityIDs(next);
+    else if (selected) setTokens((items) => items.map((token) => token.id === selected.id ? { ...token, abilityIDs: next } : token));
+  };
+  const recoverStamina = () => {
+    if (!selected) return;
+    setTokens((items) => items.map((token) => token.id === selected.id ? { ...token, staminaSpent: 0 } : token));
+    setError(null); addLog("Estamina recuperada até o limite da arma equipada.");
+  };
   const restoreSelected = () => {
     if (!selected) return;
     if (tokens.some((token) => token.id !== selected.id && token.life > 0 && positionKey(token) === positionKey(selected))) {
       setError("Mova o token que ocupa esse slot antes de reviver a unidade."); return;
     }
-    setTokens((items) => items.map((token) => token.id === selected.id ? { ...token, life: token.maxLife, shield: token.maxShield } : token));
+    setTokens((items) => items.map((token) => token.id === selected.id ? { ...token, life: token.maxLife, shield: token.maxShield, staminaSpent: 0 } : token));
     // Remount stationary sprites at their authoritative slot when reviving.
-    setVersion((value) => value + 1); setError(null); addLog("Vida e escudo restaurados.");
+    setVersion((value) => value + 1); setError(null); addLog("Vida, escudo e estamina restaurados.");
   };
   const reset = () => {
     if (!initial.current) return;
     const snapshot = structuredClone(initial.current);
     setConfig(snapshot.config); setTokens(snapshot.tokens); setSelectedID(snapshot.tokens[0]?.id ?? null);
-    setTool("select"); setHovered(null); setVersion((value) => value + 1); setError(null); setLog(["Cenário reiniciado."]);
+    setActiveAbilityID(null); setMatchAbilityUses({});
+    setTool("select"); setAbilityIDs([]); setHovered(null); setVersion((value) => value + 1); setError(null); setLog(["Cenário reiniciado."]);
   };
 
   return (
@@ -189,9 +247,10 @@ export default function SkillsLab() {
             {TOOLS.map((item) => <button type="button" key={item.id} aria-pressed={tool === item.id} disabled={pending || !config || (item.id === "attack" && (!selected || selected.life <= 0))}
               onClick={() => { setTool(item.id); setHovered(null); setError(null); }}>{item.label}</button>)}
           </div>
-          <p className="lab-hint" role="status">{pending ? "Preparando o teste…" : TOOLS.find((item) => item.id === tool)?.hint}</p>
+          <p className="lab-hint" role="status">{pending ? "Preparando o teste…" : tool === "skill" ? `${activeAbility?.name}: clique no terreno alvo. Os destinos válidos estão destacados ao passar o mouse; a granada mostra a área da explosão.` : TOOLS.find((item) => item.id === tool)?.hint}</p>
           {config ? <ProceduralMap key={version} width={15} height={15} tiles={board} actors={actors} className="lab-map"
             interaction={{ selectable, attackTargets, onHover: setHovered, onSelect: (tile) => { void onSelect(tile); },
+              area: tool === "skill" && hovered && selectable.has(positionKey(hovered)) ? abilityArea(activeAbility,hovered,board) : [],
               path: selected && preview ? [{ x: selected.x, y: selected.y }, ...preview] : [] }} />
             : <div className="lab-placeholder">{pending ? "Carregando o mapa e o catálogo de armas…" : "Use Gerar cenário para tentar novamente."}</div>}
         </section>
@@ -206,7 +265,8 @@ export default function SkillsLab() {
                 <ul className="lab-effects">{weapon.effect.map((effect) => <li key={effect.id} data-negative={effect.negative} title={effect.description}>
                   {effect.negative ? "−" : "+"} {effect.name}{effect.negative ? " (negativo)" : ""}
                 </li>)}</ul>
-                <small>Penalidades: estamina −{weapon.staminaPenalty} · habilidades −{weapon.toolPenalty}. Desativadas neste modo.</small></div> : <p>Selecione um token ou adicione uma unidade.</p>; })()}
+                <p>Estamina: {tool === "add" ? effectiveStamina(baseStamina, [weapon]) : selectedStamina?.current ?? 0}/{effectiveStamina(baseStamina, [weapon])} · Base {baseStamina} − {weapon.staminaPenalty}</p>
+                <small>Penalidade de estamina ativa. Penalidade de habilidades −{weapon.toolPenalty} ainda não aplicada.</small></div> : <p>Selecione um token ou adicione uma unidade.</p>; })()}
             {tool === "add" ? <div className="lab-input-grid">
               <label>Equipe<select value={team} onChange={(event) => setTeam(Number(event.target.value))}><option value={0}>1 · Azul</option><option value={1}>2 · Amarela</option></select></label>
               <label>Personagem<select value={model} onChange={(event) => setModel(Number(event.target.value) as CharacterModel)}><option value={0}>Modelo 1</option><option value={1}>Modelo 2</option><option value={2}>Modelo 3</option></select></label>
@@ -220,14 +280,22 @@ export default function SkillsLab() {
               <label>Elevação<select value={height} onChange={(event) => setHeight(Number(event.target.value))}>{[0, 1, 2, 3].map((level) => <option key={level} value={level}>Nível {level}</option>)}</select></label>
             </div> : null}
           </fieldset>
+          <AbilitySelector abilities={abilities} value={tool === "add" ? abilityIDs : selected?.abilityIDs ?? []}
+            onChange={equipAbility} addingToken={tool === "add"}
+            onUse={startAbility} activeAbilityID={tool === "skill" ? activeAbilityID : null}
+            activationProblem={(ability) => labAbilityProblem(selected,ability,board,tokens,matchAbilityUses)}
+            disabled={pending || !config || (tool !== "add" && !selected)} />
           <section className="lab-card" aria-label="Tokens no cenário">
             <div className="lab-card-heading"><h2>Tokens <span>{tokens.length}</span></h2><button disabled={pending || !tokens.length} onClick={() => { setTokens([]); setSelectedID(null); setError(null); }}>Limpar</button></div>
             <div className="lab-token-list">{tokens.map((token, index) => <button key={token.id} disabled={pending} aria-pressed={selectedID === token.id}
               onClick={() => { chooseToken(token); if (tool === "add" || tool === "remove" || tool === "paint") setTool("select"); }}>
               <span className="lab-team-dot" style={{ background: TEAMS[token.team] }} />
-              <span>Token {index + 1} · E{token.team + 1}<small>{token.life <= 0 ? "☠ Derrotado" : `Vida ${token.life}/${token.maxLife} · Escudo ${token.shield}/${token.maxShield}`} · ({token.x}, {token.y})</small></span>
+              <span>Token {index + 1} · E{token.team + 1}<small>{token.life <= 0 ? "☠ Derrotado" : `Vida ${token.life}/${token.maxLife} · Escudo ${token.shield}/${token.maxShield}`} · ({token.x}, {token.y})</small><small>Estamina {labStamina(token, weapons, baseStamina).current}/{labStamina(token, weapons, baseStamina).max}</small></span>
             </button>)}</div>
-            {selected ? <button className="lab-restore" disabled={pending} onClick={restoreSelected}>Restaurar vida e escudo do selecionado</button> : null}
+            {selected ? <>
+              <button className="lab-restore" disabled={pending || selected.life <= 0 || selectedStamina?.current === selectedStamina?.max} onClick={recoverStamina}>Recuperar estamina</button>
+              <button className="lab-restore" disabled={pending} onClick={restoreSelected}>Restaurar recursos do selecionado</button>
+            </> : null}
           </section>
           <section className="lab-card"><h2>Registro de testes</h2><ol className="lab-log" aria-live="polite" aria-relevant="additions">{log.map((message, index) => <li key={`${log.length}-${index}`}>{message}</li>)}</ol></section>
         </aside>

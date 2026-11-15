@@ -41,7 +41,7 @@ test("opposite camera reverses depth and projection on rectangular maps without 
   assert.ok(viewDepth(tiles[0], reverse) > viewDepth(tiles[44], reverse));
 });
 
-test("skills lab previews weapon restrictions and reuses movement with free stamina", () => {
+test("skills lab previews weapon restrictions and reuses movement with limited stamina", () => {
   const { labAttackProblem, labMovementUnit, starterTokens } = compile("internal/game/skillsLab.ts");
   const board = Array.from({ length: 225 }, (_, i) => ({ x: i % 15, y: Math.floor(i / 15), terrain: "grass", height: 0, elevation: 0 }));
   const weapons = [
@@ -67,13 +67,71 @@ test("skills lab previews weapon restrictions and reuses movement with free stam
   board.find((tile) => tile.x === 5 && tile.y === 5).height = 1;
   for (const id of ["katana", "warHammer"]) assert.ok(labAttackProblem({ ...attacker, weaponID: id }, target, board, weapons));
   const unit = labMovementUnit(attacker, weapons);
-  assert.equal(unit.currentStamina, 999);
+  assert.equal(unit.currentStamina, 4);
   assert.equal(unit.unit.weapons[0].id, "pistol");
   const starters = starterTokens(board, weapons);
   assert.equal(starters.length, 3);
   assert.equal(new Set(starters.map((token) => `${token.x},${token.y}`)).size, 3);
   assert.equal(starters.filter((token) => token.team === 0).length, 1);
   for (const target of starters.slice(1)) assert.ok(target.x === starters[0].x || target.y === starters[0].y);
+});
+
+test("weapon stamina penalties limit lab paths and preserve expenditure across equipment changes", () => {
+  const { labStamina, labMovementUnit, labAttackProblem } = compile("internal/game/skillsLab.ts");
+  const { movementOptions } = compile("internal/game/pathfinding.ts");
+  const weapons = [
+    {id:"pistol",staminaPenalty:0,range:2,effect:[]},
+    {id:"shotgun",staminaPenalty:1,range:2,effect:[]},
+    {id:"sniper",staminaPenalty:2,range:5,effect:[]},
+    {id:"katana",staminaPenalty:0,range:1,effect:[]},
+    {id:"warHammer",staminaPenalty:2,range:1,effect:[]},
+  ];
+  const token = {id:"a",x:0,y:0,team:0,life:3,shield:0,maxLife:3,maxShield:3,weaponID:"pistol",staminaSpent:0,path:[]};
+  for (const [index,cap] of [4,3,2,4,2].entries()) assert.equal(labStamina({...token,weaponID:weapons[index].id},weapons).max,cap);
+  const spent = {...token,staminaSpent:3};
+  assert.equal(labStamina(spent,weapons).current,1);
+  assert.equal(labStamina({...spent,weaponID:"sniper"},weapons).current,0);
+  assert.equal(labStamina({...spent,weaponID:"pistol"},weapons).current,1);
+  const board = Array.from({length:6},(_,x)=>({x,y:0,terrain:"grass",height:0}));
+  const user = {...token,weaponID:"shotgun",staminaSpent:1};
+  const unit = labMovementUnit(user,weapons);
+  const options = movementOptions(board,unit,[unit]);
+  assert.equal(unit.currentStamina,2);
+  assert.equal(options.paths.has("2,0"),true);
+  assert.equal(options.paths.has("3,0"),false);
+  board[1].height = 1;
+  assert.equal(movementOptions(board,unit,[unit]).paths.has("2,0"),false);
+  assert.equal(labAttackProblem({...token,staminaSpent:4},{...token,id:"b",x:1,team:1},board,weapons),null);
+  assert.equal(labStamina({...token,weaponID:"sniper",staminaSpent:0},weapons).current,2);
+});
+
+test("ability previews enforce usage, cardinal targets, height, and the grenade area", () => {
+  const {labAbilityProblem,abilityArea} = compile("internal/game/abilities.ts");
+  const board = Array.from({length:225},(_,i)=>({x:i%15,y:Math.floor(i/15),terrain:"grass",height:0}));
+  const base = {uses:"single",range:0,maxUsesPerMatch:0,maxActivePerMatch:0,effect:[]};
+  const shield = {...base,id:"shield",shield:3,effect:[{id:"grantShield"}]};
+  const barricade = {...base,id:"barricade",range:1,maxActivePerMatch:3,effect:[{id:"createBarricade"},{id:"sameLevelOnly"}]};
+  const jump = {...base,id:"trampoline",range:2,movement:{forwardDistance:2,climbDistance:1,climbLevels:1},effect:[{id:"leap"}]};
+  const grenade = {...base,id:"grenade",uses:"unlimited",range:2,areaSize:3,maxUsesPerMatch:1,effect:[{id:"areaDamageOrShieldBreak"}]};
+  const actor = {id:"a",x:5,y:5,life:3,shield:0,staminaSpent:4,abilityIDs:["shield","barricade"]};
+  assert.equal(labAbilityProblem(actor,shield,board,[actor],{},actor),null);
+  assert.ok(labAbilityProblem({...actor,shield:3},shield,board,[actor],{},actor));
+  assert.ok(labAbilityProblem({...actor,abilityUses:{shield:1}},shield,board,[actor],{},actor));
+  assert.equal(labAbilityProblem(actor,barricade,board,[actor],{},{x:6,y:5}),null);
+  assert.ok(labAbilityProblem(actor,barricade,board,[actor],{},{x:6,y:6}));
+  board[5*15+6].height=1;
+  assert.ok(labAbilityProblem(actor,barricade,board,[actor],{},{x:6,y:5}));
+  const jumper = {...actor,abilityIDs:["trampoline"]};
+  assert.equal(labAbilityProblem(jumper,jump,board,[jumper],{},{x:6,y:5}),null);
+  board[5*15+6].height=0; board[5*15+6].terrain="water";
+  assert.equal(labAbilityProblem(jumper,jump,board,[jumper],{},{x:7,y:5}),null);
+  assert.ok(labAbilityProblem(jumper,jump,board,[jumper],{},{x:6,y:5}));
+  const grenadier={...actor,abilityIDs:["grenade"]};
+  assert.equal(labAbilityProblem(grenadier,grenade,board,[grenadier],{},{x:7,y:5}),null);
+  assert.ok(labAbilityProblem(grenadier,grenade,board,[grenadier],{grenade:1},{x:7,y:5}));
+  assert.ok(labAbilityProblem(grenadier,grenade,board,[grenadier,{...actor,id:"used",abilityUses:{grenade:1}}],{},{x:7,y:5}));
+  assert.equal(abilityArea(grenade,{x:7,y:5},board).length,9);
+  assert.equal(abilityArea(grenade,{x:0,y:0},board).length,4);
 });
 
 test("reusable negative effects control multiplayer and lab previews independently of weapon ID", () => {

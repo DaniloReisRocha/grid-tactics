@@ -5,6 +5,8 @@ import "github.com/DaniloReisRocha/grid-tactics/backend/models"
 func isBridge(cell models.Cell) bool {
 	return cell.Object == models.ObjectBridgeX || cell.Object == models.ObjectBridgeY
 }
+
+func IsWalkable(cell models.Cell) bool { return walkable(cell) }
 func walkable(cell models.Cell) bool {
 	if isBridge(cell) {
 		return true

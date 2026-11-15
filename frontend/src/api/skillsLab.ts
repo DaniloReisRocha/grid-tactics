@@ -1,4 +1,4 @@
-import type { Cell, Position, Weapon } from "./models";
+import type { Ability, Cell, Position, Weapon } from "./models";
 import type { CharacterModel } from "@/components/ProceduralMap/types";
 
 export interface SkillToken extends Position {
@@ -10,11 +10,16 @@ export interface SkillToken extends Position {
   maxLife: number;
   maxShield: number;
   weaponID: string;
+  abilityIDs: string[];
+  staminaSpent: number;
+  abilityUses?: Record<string, number>;
+  movementMode?: "jump" | "";
   path: Position[];
 }
 
-export interface LabConfig { board: Cell[]; weapons: Weapon[] }
+export interface LabConfig { board: Cell[]; weapons: Weapon[]; abilities: Ability[]; baseStamina: number }
 export interface LabResult { tokens: SkillToken[]; message: string }
+export interface LabAbilityResult extends LabResult { board: Cell[]; matchAbilityUses: Record<string, number> }
 export type LabLayout = "arena" | "procedural";
 
 function labURL() {
@@ -53,4 +58,10 @@ export function attackInLab(board: Cell[], tokens: SkillToken[], attackerID: str
     method: "POST", signal, headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ board, tokens, attackerID, targetID }),
   });
+}
+
+export function activateAbilityInLab(board: Cell[], tokens: SkillToken[], actorID: string, abilityID: string, target: Position, matchAbilityUses: Record<string, number>, signal: AbortSignal) {
+  const url = labURL(); url.pathname += "/ability";
+  return request<LabAbilityResult>(url, { method: "POST", signal, headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({board,tokens,actorID,abilityID,target,matchAbilityUses}) });
 }

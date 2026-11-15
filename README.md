@@ -30,7 +30,7 @@ O frontend lê a URL completa do WebSocket da variável `VITE_WS_URL`, configura
 3. Em outra aba, gere outra conta e entre na mesma sessão.
 4. No seu turno, selecione uma unidade. O hover mostra a rota e o clique envia o destino ao servidor.
 5. Cada passo custa `1 + min(2, max(0, altura do destino - altura de origem))` de stamina. No mesmo nível ou descendo, o custo é 1; subir um nível custa 2 e subir dois ou mais níveis custa 3. O adicional é calculado a cada passo, não pela altitude absoluta do terreno. Árvores, florestas e rochas são transitáveis, sem custo adicional. Unidades vivas, casas e ruínas bloqueiam o caminho. Água só pode ser atravessada por pontes, no sentido da ponte; a locomoção usa apenas as quatro direções do grid, sem passos diagonais.
-6. Para atacar, selecione uma unidade sua, clique em **Atacar** e escolha um inimigo em alcance, na mesma linha ou coluna do atacante. Cada unidade pode atacar uma vez por turno, mesmo com stamina zero. Ataques não gastam stamina; a propriedade `staminaPenalty` está temporariamente ignorada. A pistola causa 4 de dano e tem alcance 2. Escudo absorve dano antes da vida. Tentativas inválidas não consomem o ataque, e a disponibilidade é renovada no início do próximo turno do dono da unidade.
+6. Para atacar, selecione uma unidade sua, clique em **Atacar** e escolha um inimigo em alcance, na mesma linha ou coluna do atacante. Cada unidade pode atacar uma vez por turno, mesmo com stamina zero. Ataques não gastam stamina; `staminaPenalty` reduz a estamina máxima de movimento. O máximo efetivo é a estamina base menos as penalidades das armas equipadas, limitado a zero, e é usado no spawn e na recuperação do turno. A pistola causa 1 de dano e tem alcance 2. Escudo absorve dano antes da vida. Tentativas inválidas não consomem o ataque, e a disponibilidade é renovada no início do próximo turno do dono da unidade.
 7. Finalizar o turno passa a vez e recupera a stamina das unidades vivas do próximo jogador.
 
 Eliminar todas as unidades adversárias vence a partida. **Sair da partida** após o início conta como desistência. Uma queda de conexão pausa o jogo; entrar com a mesma conta restaura a partida. Abrir a mesma conta em outra conexão substitui a conexão anterior.
@@ -59,12 +59,12 @@ Abra `/skills-lab` pelo atalho na página inicial. Não é necessário criar con
 
 - Escolha a arena de testes ou gere um mapa procedural por seed.
 - Use **+ Token** para adicionar unidades de duas equipes, escolhendo personagem, arma, vida e escudo.
-- Em **Selecionar / mover**, selecione uma unidade e clique em um destino. O hover mostra a rota, com movimento sem limite de estamina.
+- Em **Selecionar / mover**, selecione uma unidade e clique em um destino. O hover mostra a rota, com movimento limitado à estamina disponível após a penalidade da arma. Mover consome o custo da rota; o botão **Recuperar estamina** restaura até o máximo efetivo.
 - Equipe uma das cinco armas e use **Testar ataque**. Os alvos válidos ficam destacados; ataques só atingem a mesma linha ou coluna do atacante. A escopeta quebra o escudo; o sniper não atinge adjacentes; katana e martelo exigem o mesmo nível; o martelo empurra quando o destino permite.
 - Use **Editar terreno** para pintar slots vazios com grama, terra, água, casas, árvores ou rochas, nos níveis de 0 a 3.
 - A lista permite selecionar qualquer token, inclusive derrotados, para restaurar sua vida e escudo. Também é possível remover tokens, limpar a lista e reiniciar o cenário.
 
-O laboratório permite ataques repetidos e mantém as penalidades desativadas. As simulações são isoladas das sessões multiplayer. O registro mostra o dano à vida, ao escudo e o resultado dos empurrões. O cenário é temporário e volta ao estado inicial ao recarregar a página.
+O laboratório permite ataques repetidos, inclusive com estamina zero, e aplica as penalidades de estamina das armas. Com base 4, pistola e katana mantêm 4, escopeta permite 3, e sniper e martelo permitem 2. O gasto de movimento é preservado ao trocar de arma; recuperar estamina ou reiniciar o cenário permite repetir o teste. A penalidade de habilidades continua desativada. As simulações são isoladas das sessões multiplayer. O registro mostra o dano à vida, ao escudo e o resultado dos empurrões. O cenário é temporário e volta ao estado inicial ao recarregar a página.
 
 ## Efeitos das armas
 
@@ -73,6 +73,22 @@ O laboratório permite ataques repetidos e mantém as penalidades desativadas. A
 `negative: true` identifica uma restrição para quem equipa a arma. Os efeitos continuam ativos: “sem ataques adjacentes” restringe a distância mínima, e “mesmo nível” restringe a altura do alvo. Katana e martelo compartilham a mesma definição de restrição de altura. Empurrão e quebra de escudo são efeitos positivos para quem ataca.
 
 O combate multiplayer e o laboratório compartilham a aplicação dos efeitos em `backend/internal/realtime/game/weapon_effects.go`. As prévias do frontend consultam os mesmos IDs de efeito; os efeitos negativos também aparecem no painel do laboratório. Adicionar um efeito existente a outra arma permite reutilizar o comportamento sem verificar o ID da arma.
+
+## Recursos e catálogo de habilidades
+
+As constantes em `backend/models/unit_rules.go` definem as unidades iniciais: 3 de vida, capacidade de escudo de 3, 4 de estamina, 1 slot de item e 2 slots de habilidades. O escudo ativo começa em zero; a capacidade de escudo não concede proteção automática. Reconectar preserva o escudo ativo da unidade.
+
+`backend/models/abilities.go` contém `Ability`, `AbilityOptions()` e `AbilityByID()`, seguindo o catálogo de armas. Os IDs fixos são `shield`, `barricade`, `trampoline` e `grenade`. Cada habilidade possui `effect`, política de uso, alcance, descrição e os parâmetros específicos necessários. A barricada compartilha o efeito negativo de mesmo nível com as armas. O trampolim registra separadamente o avanço de dois terrenos e a subida de um terreno de um nível superior.
+
+A granada conserva `uses: "unlimited"` da tabela e `maxUsesPerMatch: 1` da descrição, representados separadamente. Sua área tem lado 3, alcance 2 e dano 2; o efeito afeta aliadas e adversárias, quebrando o escudo de quem possui proteção ou causando dano a quem está sem escudo. A quebra de escudo da granada é um efeito diferente da quebra após dano de uma arma.
+
+O catálogo de habilidades também é enviado em `GET /api/skills-lab`. As unidades iniciais possuem dois slots disponíveis e uma lista de habilidades equipadas vazia. No laboratório, o painel **Skills** permite escolher até duas habilidades diferentes para o token selecionado ou para novos tokens. Os slots aceitam **Nenhuma**, exibem os efeitos e limites da habilidade escolhida e são preservados nas respostas de ataque.
+
+No laboratório, clique em **Usar** na habilidade equipada. Escudo aplica 3 pontos de proteção à própria unidade. Barricada exige um terreno adjacente, seco, livre e do mesmo nível; bloqueia a passagem e usa um asset de muralha, com no máximo três barricadas ativas em todo o cenário. É possível removê-las com o editor de terreno. Trampolim salta dois terrenos em uma direção do grid, no mesmo nível, ou sobe um terreno adjacente de um nível acima; o destino precisa estar livre, mas o terreno intermediário pode conter água ou obstáculos. O salto tem animação própria e não gasta estamina.
+
+Granada permite escolher seu centro até dois terrenos adiante, na mesma linha ou coluna. O hover marca a área 3 × 3, recortada nas bordas do mapa. Todas as unidades vivas na área, incluindo a própria unidade e aliadas, recebem 2 de dano se estiverem sem escudo; quem tem escudo apenas perde a proteção, sem dano excedente à vida. O limite de uma granada vale para o cenário inteiro, independentemente da equipe ou unidade.
+
+`POST /api/skills-lab/ability` aplica os efeitos pelo ID de `Effect`, valida o cenário e retorna cópias do mapa, tokens e contadores. Alvos inválidos não consomem uso. As habilidades de uso único registram o consumo por unidade; trocar de habilidade, atacar, restaurar recursos ou recuperar estamina não renova esse uso. **Reiniciar cenário** ou gerar um novo mapa renova todos os usos. A ativação está conectada ao laboratório; o multiplayer ainda não possui comando de uso de habilidades.
 
 ## Verificações
 

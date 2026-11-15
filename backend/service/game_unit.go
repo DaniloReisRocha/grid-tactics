@@ -21,9 +21,11 @@ func (g *GameUnitsGetService) Run(accoID uuid.UUID) ([]models.Unit, error) {
 	for i, icon := range icons {
 		units[i] = models.Unit{
 			ID:   fmt.Sprintf("%s-%d", accoID.String(), i+1),
-			Icon: icon, LP: 3, Shield: 3, Stamina: 4,
-			Weapons: []models.Weapon{pistol},
-			Tools:   []string{},
+			Icon: icon, LP: models.UnitBaseLife, Shield: models.UnitShieldCapacity, Stamina: models.UnitBaseStamina,
+			ItemSlots: models.UnitItemSlots, AbilitySlots: models.UnitAbilitySlots,
+			Abilities: []models.Ability{},
+			Weapons:   []models.Weapon{pistol},
+			Tools:     []string{},
 		}
 	}
 	return units, nil

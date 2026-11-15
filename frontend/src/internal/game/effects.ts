@@ -5,6 +5,10 @@ export const EffectID = {
   shieldBreak: "shieldBreak",
   noAdjacent: "noAdjacentTargets",
   sameLevel: "sameLevelOnly",
+  grantShield: "grantShield",
+  createBarricade: "createBarricade",
+  leap: "leap",
+  areaDamageOrShieldBreak: "areaDamageOrShieldBreak",
 } as const;
 
 export function weaponEffectProblem(weapon: Weapon, distance: number, attackerHeight?: number, targetHeight?: number) {

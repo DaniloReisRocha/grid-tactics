@@ -14,9 +14,18 @@ export type Weapon = {
   lifePenalty?: number; staminaPenalty: number; toolPenalty: number; description: string;
   effect: Effect[];
 };
+export type Ability = {
+  id: string; name: string; icon: string;
+  uses: "single" | "unlimited";
+  range: number; damage: number; shield: number; areaSize: number;
+  maxActivePerMatch: number; maxUsesPerMatch: number;
+  movement?: { forwardDistance: number; climbDistance: number; climbLevels: number };
+  description: string; effect: Effect[];
+};
 export type Unit = {
   id: string; lp: number; icon: string; shield: number; stamina: number;
   weapons: Weapon[]; tools: string[];
+  itemSlots: number; abilitySlots: number; abilities: Ability[];
 };
 export type UnitInstance = Position & {
   player: number; ownerID: string;

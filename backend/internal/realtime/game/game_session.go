@@ -122,7 +122,8 @@ func (s *GameSession) AddPlayer(conn *realtime.WSConnection, id uuid.UUID, units
 			occupied[position] = true
 			roster = append(roster, models.UnitInstance{
 				Position: position, Player: len(s.TurnOrder) + 1, OwnerID: id, Unit: unit,
-				CurrentLife: unit.LP, CurrentShield: unit.Shield, CurrentStamina: unit.Stamina,
+				// Shield is a capacity; only abilities grant an active shield.
+				CurrentLife: unit.LP, CurrentShield: 0, CurrentStamina: unit.EffectiveStamina(),
 			})
 			found = true
 			break

@@ -11,9 +11,11 @@ export interface MapActor {
   color: string;
   selected: boolean;
   defeated: boolean;
+  movementMode?: "jump" | "";
 }
 export interface MapInteraction {
   path: readonly { x: number; y: number }[];
+  area?: readonly { x: number; y: number }[];
   selectable: ReadonlySet<string>;
   attackTargets: ReadonlySet<string>;
   onSelect: (tile: MapTile) => void;

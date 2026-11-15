@@ -16,6 +16,7 @@ interface CharacterProps {
   onHover?: (hovered: boolean) => void;
   onSprite?: (sprite: Sprite | null) => void;
   onElevation?: (height: number) => void;
+  jump?: boolean;
 }
 
 const FRAME_WIDTH = 16;
@@ -35,7 +36,7 @@ function project(tile: MapTile, view: MapView) {
   };
 }
 
-export default function Character({ spawn, path, view, onError, model = 2, onSelect, onHover, onSprite, onElevation }: CharacterProps) {
+export default function Character({ spawn, path, view, onError, model = 2, onSelect, onHover, onSprite, onElevation, jump = false }: CharacterProps) {
   const spriteRef = useRef<Sprite>(null);
   const registerSprite = useCallback((sprite: Sprite | null) => {
     spriteRef.current = sprite;
@@ -106,12 +107,12 @@ export default function Character({ spawn, path, view, onError, model = 2, onSel
     onElevation?.(surfaceHeight(state.from) + (surfaceHeight(state.to) - surfaceHeight(state.from)) * progress);
     const from = project(state.from, view);
     const to = project(state.to, view);
-    sprite.position.set(from.x + (to.x - from.x) * progress, from.y + (to.y - from.y) * progress);
+    sprite.position.set(from.x + (to.x - from.x) * progress, from.y + (to.y - from.y) * progress - (jump ? Math.sin(progress * Math.PI) * 30 : 0));
     // Interleave the character with terrain columns and their objects.
     const depth = (tile: MapTile) => viewDepth(tile, view);
     sprite.zIndex = depth(state.from) + (depth(state.to) - depth(state.from)) * progress + 5;
     if (progress >= 1) state.clock = 0;
-    const pose = progress < 1 ? WALK_POSES[Math.floor(state.clock / 110) % WALK_POSES.length] : IDLE_POSE;
+    const pose = progress < 1 && !jump ? WALK_POSES[Math.floor(state.clock / 110) % WALK_POSES.length] : IDLE_POSE;
     sprite.texture = frames[(state.direction + (view.reversed ? 4 : 0)) % 8][pose];
   });
 

@@ -22,11 +22,12 @@ export const TERRAIN_ASSETS = {
   ruin: "/assets/tiles/sketchTown/structure_low_E.png",
   bridgeX: "/assets/tiles/sketchTown/bridge_E.png",
   bridgeY: "/assets/tiles/sketchTown/bridge_S.png",
+  barricade: "/assets/tiles/sketchTown/castle_wall_E.png",
 } as const;
 
 export type Asset = keyof typeof TERRAIN_ASSETS;
 type Terrain = "water" | "dirt" | "grass";
-type MapObject = "tree" | "rock" | "rockDirt" | "forest" | "house" | "ruin" | "bridgeX" | "bridgeY";
+type MapObject = "tree" | "rock" | "rockDirt" | "forest" | "house" | "ruin" | "bridgeX" | "bridgeY" | "barricade";
 type Roof = "roofGable" | "roofGreen" | "roofPurple";
 
 // Objects rest on the top face of a cube, rather than replacing the cube.
@@ -45,6 +46,7 @@ export const OBJECT_RULES: Record<
   ruin: { allowedTerrain: ["grass", "dirt"], surfaceOffset: LEVEL_HEIGHT },
   bridgeX: { allowedTerrain: ["water"], surfaceOffset: 20 },
   bridgeY: { allowedTerrain: ["water"], surfaceOffset: 20 },
+  barricade: { allowedTerrain: ["grass", "dirt"], surfaceOffset: LEVEL_HEIGHT },
 };
 
 export type MapTile = {
@@ -73,6 +75,7 @@ export const TERRAIN_LABELS: Array<{
   { terrain: "waterfall", label: "Cachoeiras", color: "#a5e7f1" },
   { terrain: "ruin", label: "Ruínas", color: "#b67e62" },
   { terrain: "bridgeX", label: "Pontes (tiles)", color: "#d39a6e" },
+  { terrain: "barricade", label: "Barricadas", color: "#b8aa94" },
 ];
 
 export function hasBridge(tile: MapTile) {

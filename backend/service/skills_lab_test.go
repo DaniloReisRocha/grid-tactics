@@ -32,12 +32,17 @@ func TestLabWeaponEffectsAndRepeatedAttacks(t *testing.T) {
 	} {
 		t.Run(test.weapon, func(t *testing.T) {
 			input := labFixture(test.weapon, test.x)
+			// Even an exhausted token can attack, without any further stamina cost.
+			input.Tokens[0].StaminaSpent = models.UnitBaseStamina
 			before := append([]models.SkillToken(nil), input.Tokens...)
 			result, err := ResolveSkillsLabAttack(input)
 			if err != nil {
 				t.Fatal(err)
 			}
 			target := result.Tokens[1]
+			if result.Tokens[0].StaminaSpent != models.UnitBaseStamina {
+				t.Fatal("attack charged or restored movement stamina")
+			}
 			if target.Life != test.life || target.Shield != test.shield || target.X != test.finalX {
 				t.Fatalf("unexpected target: %+v", target)
 			}
@@ -67,7 +72,7 @@ func TestLabWeaponEffectsAndRepeatedAttacks(t *testing.T) {
 }
 
 func TestLabAttackRestrictionsDoNotChangeTokens(t *testing.T) {
-	for _, name := range []string{"sniper adjacent", "katana height", "hammer height", "out of range", "friendly", "dead attacker", "unknown weapon", "missing target"} {
+	for _, name := range []string{"sniper adjacent", "katana height", "hammer height", "out of range", "friendly", "dead attacker", "unknown weapon", "missing target", "too many abilities", "duplicate ability", "unknown ability"} {
 		t.Run(name, func(t *testing.T) {
 			input := labFixture(models.WeaponPistolID, 5)
 			switch name {
@@ -93,6 +98,12 @@ func TestLabAttackRestrictionsDoNotChangeTokens(t *testing.T) {
 				input.Tokens[0].WeaponID = "invalid"
 			case "missing target":
 				input.TargetID = "missing"
+			case "too many abilities":
+				input.Tokens[0].AbilityIDs = []string{models.AbilityShieldID, models.AbilityBarricadeID, models.AbilityTrampolineID}
+			case "duplicate ability":
+				input.Tokens[0].AbilityIDs = []string{models.AbilityShieldID, models.AbilityShieldID}
+			case "unknown ability":
+				input.Tokens[0].AbilityIDs = []string{"unknown"}
 			}
 			before := append([]models.SkillToken(nil), input.Tokens...)
 			if _, err := ResolveSkillsLabAttack(input); err == nil {

@@ -10,7 +10,8 @@ func combinedEffectWeapon() models.Weapon {
 	// Deliberately reuse all effects on a pistol: behavior must follow effects,
 	// rather than require the original shotgun/sniper/hammer weapon IDs.
 	weapon := models.Weapon{ID: models.WeaponPistolID, Damage: 1, Range: 3}
-	for _, effect := range models.EffectOptions() {
+	for _, id := range []string{models.EffectKnockbackID, models.EffectShieldBreakID, models.EffectNoAdjacentID, models.EffectSameLevelID} {
+		effect, _ := models.EffectByID(id)
 		weapon.Effect = append(weapon.Effect, effect)
 	}
 	return weapon
