@@ -22,7 +22,7 @@ func TestSkillsLabHTTPFlow(t *testing.T) {
 	get := httptest.NewRecorder()
 	router.ServeHTTP(get, httptest.NewRequest(http.MethodGet, "/api/skills-lab?layout=arena", nil))
 	var config models.SkillsLabConfig
-	if get.Code != http.StatusOK || json.Unmarshal(get.Body.Bytes(), &config) != nil || len(config.Weapons) != 5 || len(config.Abilities) != 4 || len(config.Board) != 225 {
+	if get.Code != http.StatusOK || json.Unmarshal(get.Body.Bytes(), &config) != nil || len(config.Weapons) != 5 || len(config.Abilities) != 5 || len(config.Board) != 225 {
 		t.Fatalf("failed to load lab: %d %s", get.Code, get.Body.String())
 	}
 	input := models.SkillsLabAttack{Board: config.Board, AttackerID: "a", TargetID: "b", Tokens: []models.SkillToken{

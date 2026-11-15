@@ -198,6 +198,31 @@ test("orbs restore ability allowances and equipped passives without altering com
   assert.equal(restoreOrbAbilities(dead,[shield,grenade]),dead);
 });
 
+test("medkit preview accepts wounded allies and self, rejects invalid targets, and renews with an orb", () => {
+  const {labAbilityProblem,restoreOrbAbilities} = compile("internal/game/abilities.ts");
+  const board = Array.from({length:225},(_,i)=>({x:i%15,y:Math.floor(i/15),height:0,terrain:"grass"}));
+  const medkit = {id:"medkit",range:1,heal:2,maxUsesPerMatch:1,effect:[{id:"healAlly"}]};
+  const actor = {id:"a",x:5,y:5,life:1,maxLife:3,team:0,abilityIDs:["medkit"],abilityUses:{}};
+  assert.equal(labAbilityProblem(actor,medkit,board,[actor],{},actor),null);
+  for (const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+    const ally = {...actor,id:"ally",x:actor.x+dx,y:actor.y+dy};
+    assert.equal(labAbilityProblem(actor,medkit,board,[actor,ally],{},ally),null);
+    assert.ok(labAbilityProblem(actor,medkit,board,[actor,{...ally,team:1}],{},ally));
+    assert.ok(labAbilityProblem(actor,medkit,board,[actor,{...ally,life:0}],{},ally));
+    assert.ok(labAbilityProblem(actor,medkit,board,[actor,{...ally,life:3}],{},ally));
+    assert.ok(labAbilityProblem(actor,medkit,board,[actor],{},ally));
+  }
+  for (const [x,y] of [[6,6],[7,5]]) {
+    const ally = {...actor,id:"ally",x,y};
+    assert.ok(labAbilityProblem(actor,medkit,board,[actor,ally],{},ally));
+  }
+  const used = {...actor,abilityUses:{medkit:1}};
+  assert.ok(labAbilityProblem(used,medkit,board,[used],{},used));
+  const recovered = restoreOrbAbilities(used,[medkit]);
+  assert.equal(recovered.life,1);
+  assert.equal(labAbilityProblem(recovered,medkit,board,[recovered],{medkit:5},recovered),null);
+});
+
 test("ability previews enforce usage, cardinal targets, height, and the grenade area", () => {
   const {labAbilityProblem,abilityArea} = compile("internal/game/abilities.ts");
   const board = Array.from({length:225},(_,i)=>({x:i%15,y:Math.floor(i/15),terrain:"grass",height:0}));

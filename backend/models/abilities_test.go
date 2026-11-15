@@ -34,7 +34,7 @@ func TestAbilityCatalogSerializesAndSharesEffectDefinitions(t *testing.T) {
 	if _, ok := AbilityByID("missing"); ok {
 		t.Fatal("unknown ability resolved")
 	}
-	for id, limit := range map[string]int{AbilityBarricadeID: 3, AbilityGrenadeID: 1, AbilityTrampolineID: 1} {
+	for id, limit := range map[string]int{AbilityBarricadeID: 3, AbilityGrenadeID: 1, AbilityTrampolineID: 1, AbilityMedkitID: 1} {
 		ability, _ := AbilityByID(id)
 		if ability.MaxUsesPerMatch != limit {
 			t.Fatalf("%s: incorrect per-unit limit", id)

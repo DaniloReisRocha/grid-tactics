@@ -7,6 +7,7 @@ export const EffectID = {
   noAdjacent: "noAdjacentTargets",
   sameLevel: "sameLevelOnly",
   grantShield: "grantShield",
+  healAlly: "healAlly",
   createBarricade: "createBarricade",
   leap: "leap",
   areaDamageOrShieldBreak: "areaDamageOrShieldBreak",

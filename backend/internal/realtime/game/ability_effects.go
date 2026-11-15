@@ -62,6 +62,16 @@ func ResolveAbilityEffects(input models.SkillsLabAbility) (models.SkillsLabAbili
 	occupied := func(position models.Position) bool {
 		return slices.ContainsFunc(input.Tokens, func(token models.SkillToken) bool { return token.Life > 0 && token.Position == position })
 	}
+	healTargetIndex := -1
+	if ability.HasEffect(models.EffectHealAllyID) {
+		healTargetIndex = slices.IndexFunc(input.Tokens, func(token models.SkillToken) bool { return token.Position == input.Target && token.Life > 0 })
+		if healTargetIndex < 0 || input.Tokens[healTargetIndex].Team != actor.Team {
+			return result, errors.New("escolha uma unidade aliada viva ou a própria unidade")
+		}
+		if input.Tokens[healTargetIndex].Life >= input.Tokens[healTargetIndex].MaxLife {
+			return result, errors.New("a unidade alvo já está com a vida máxima")
+		}
+	}
 	if ability.HasEffect(models.EffectGrantShieldID) {
 		if input.Target != actor.Position {
 			return result, errors.New("o escudo só pode ser aplicado à própria unidade")
@@ -92,7 +102,7 @@ func ResolveAbilityEffects(input models.SkillsLabAbility) (models.SkillsLabAbili
 			}
 		}
 	}
-	if !ability.HasEffect(models.EffectGrantShieldID) && !ability.HasEffect(models.EffectCreateBarricadeID) && !ability.HasEffect(models.EffectLeapID) && !ability.HasEffect(models.EffectAreaDamageOrShieldBreakID) {
+	if !ability.HasEffect(models.EffectHealAllyID) && !ability.HasEffect(models.EffectGrantShieldID) && !ability.HasEffect(models.EffectCreateBarricadeID) && !ability.HasEffect(models.EffectLeapID) && !ability.HasEffect(models.EffectAreaDamageOrShieldBreakID) {
 		return result, errors.New("habilidade sem efeito executável")
 	}
 	result.Board = slices.Clone(input.Board)
@@ -105,6 +115,12 @@ func ResolveAbilityEffects(input models.SkillsLabAbility) (models.SkillsLabAbili
 	unit.AbilityUses = maps.Clone(actor.AbilityUses)
 	if unit.AbilityUses == nil {
 		unit.AbilityUses = map[string]int{}
+	}
+	if healTargetIndex >= 0 {
+		target := &result.Tokens[healTargetIndex]
+		before := target.Life
+		target.Life = min(target.MaxLife, target.Life+ability.Heal)
+		result.Message = fmt.Sprintf("%s: %d ponto(s) de vida recuperado(s).", ability.Name, target.Life-before)
 	}
 	if ability.HasEffect(models.EffectGrantShieldID) {
 		unit.Shield = min(ability.Shield, models.UnitShieldCapacity)

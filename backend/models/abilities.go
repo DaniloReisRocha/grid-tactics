@@ -5,6 +5,7 @@ const (
 	AbilityBarricadeID  = "barricade"
 	AbilityTrampolineID = "trampoline"
 	AbilityGrenadeID    = "grenade"
+	AbilityMedkitID     = "medkit"
 )
 
 type AbilityMovement struct {
@@ -20,6 +21,7 @@ type Ability struct {
 	Icon            string           `json:"icon"`
 	Range           int              `json:"range"`
 	Damage          int              `json:"damage"`
+	Heal            int              `json:"heal"`
 	Shield          int              `json:"shield"`
 	AreaSize        int              `json:"areaSize"`
 	MaxUsesPerMatch int              `json:"maxUsesPerMatch"`
@@ -41,6 +43,7 @@ func (ability Ability) HasEffect(id string) bool {
 // Passive abilities cannot be activated and do not consume this allowance.
 func AbilityOptions() []Ability {
 	grantShield, _ := EffectByID(EffectGrantShieldID)
+	healAlly, _ := EffectByID(EffectHealAllyID)
 	createBarricade, _ := EffectByID(EffectCreateBarricadeID)
 	leap, _ := EffectByID(EffectLeapID)
 	areaDamageOrShieldBreak, _ := EffectByID(EffectAreaDamageOrShieldBreakID)
@@ -69,6 +72,12 @@ func AbilityOptions() []Ability {
 			Range: 2, Damage: 2, AreaSize: 3, MaxUsesPerMatch: 1,
 			Description: "Cada unidade equipada pode usar uma granada por partida, independentemente das outras unidades. Escolha uma área de 3 × 3 dentro do alcance máximo de 2 terrenos da unidade. Todas as unidades na área recebem 2 pontos de dano ou têm seus escudos quebrados.",
 			Effect:      []Effect{areaDamageOrShieldBreak},
+		},
+		{
+			ID: AbilityMedkitID, Name: "Kit Médico", Icon: "🩹",
+			Range: 1, Heal: 2, MaxUsesPerMatch: 1,
+			Description: "Recupera até 2 pontos de vida de uma unidade aliada adjacente ou da própria unidade, sem ultrapassar a vida máxima. Um uso por unidade na partida, renovável por orb.",
+			Effect:      []Effect{healAlly},
 		},
 	}
 }

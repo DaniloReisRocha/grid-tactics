@@ -27,6 +27,11 @@ export function labAbilityProblem(actor: SkillToken | undefined, ability: Abilit
   if (distance > ability.range) return "Alvo fora do alcance da habilidade.";
   if (has(EffectID.sameLevel) && from.height !== to.height) return "Escolha um terreno do mesmo nível.";
   const occupied = tokens.some((token) => token.life > 0 && token.x === target.x && token.y === target.y);
+  if (has(EffectID.healAlly)) {
+    const ally = tokens.find((token) => token.life > 0 && token.x === target.x && token.y === target.y);
+    if (!ally || ally.team !== actor.team) return "Escolha uma unidade aliada viva ou a própria unidade.";
+    if (ally.life >= ally.maxLife) return "A unidade alvo já está com a vida máxima.";
+  }
   if (has(EffectID.grantShield) && distance !== 0) return "O escudo só pode ser aplicado à própria unidade.";
   if (has(EffectID.createBarricade) && (distance !== 1 || occupied || to.terrain === "water" || to.object)) return "Escolha um terreno adjacente livre e seco.";
   if (has(EffectID.leap)) {

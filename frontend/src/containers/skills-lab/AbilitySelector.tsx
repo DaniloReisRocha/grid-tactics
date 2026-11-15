@@ -54,6 +54,7 @@ export default function AbilitySelector({ abilities, value, onChange, disabled, 
           <div><dt>Tipo</dt><dd>{ability.passive ? "Passiva" : "Ativa"}</dd></div>
           <div><dt>Alcance</dt><dd>{ability.range === 0 ? "Própria unidade" : `${ability.range} terreno(s)`}</dd></div>
           {ability.shield > 0 ? <div><dt>Escudo</dt><dd>{ability.shield}</dd></div> : null}
+          {ability.heal > 0 ? <div><dt>Cura</dt><dd>{ability.heal} de vida</dd></div> : null}
           {ability.damage > 0 ? <div><dt>Dano</dt><dd>{ability.damage}</dd></div> : null}
           {ability.areaSize > 0 ? <div><dt>Área</dt><dd>{ability.areaSize} × {ability.areaSize}</dd></div> : null}
           {!ability.passive ? <div><dt>Usos por unidade na partida</dt><dd>{ability.maxUsesPerMatch > 0 ? ability.maxUsesPerMatch : "Ilimitados"}</dd></div> : null}
