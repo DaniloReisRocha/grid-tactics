@@ -44,6 +44,8 @@ VITE_WS_URL=ws://localhost:8080/api/game-connect
 
 Eliminar todas as unidades adversárias vence a partida. **Sair da partida** após o início conta como desistência. Uma queda de conexão pausa o jogo; entrar com a mesma conta restaura a partida. Abrir a mesma conta em outra conexão substitui a conexão anterior.
 
+Durante uma partida com seis unidades, o servidor cria uma orb ao atingir quatro unidades vivas e outra ao atingir duas. Eliminações múltiplas também contam ao cruzar esses marcos. Cada posição é escolhida pela seed da sessão entre terrenos secos, livres e alcançáveis, sem unidades ou caveiras. As duas orbs nunca compartilham uma posição, mesmo após coleta. Cada marco ocorre uma vez. Atravessar uma orb recupera os usos das habilidades e as passivas da unidade; movimento normal e empurrões coletam em qualquer passo, e saltos coletam apenas no destino. Vida, estamina, ataque utilizado e recarga da arma são preservados. Spawn, coleta e restauração são confirmados pelo servidor e enviados aos dois clientes; reconectar preserva o estado das orbs.
+
 Contas por UUID são identificadores de teste, não autenticação. O WebSocket de jogo ainda não usa o login JWT disponível nas rotas HTTP. Unidades iniciais são fornecidas pelo serviço de protótipo, e sessões ficam em memória: reiniciar o servidor perde as partidas. Depois de uma partida encerrada, use outro nome de sessão para começar uma nova.
 
 ## Organização

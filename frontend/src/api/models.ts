@@ -39,6 +39,7 @@ export type UnitInstance = Position & {
 export type Player = { name: string; accoID: string; connected: boolean; units: UnitInstance[] };
 export type GameStatus = "waiting" | "playing" | "paused" | "finished";
 export type GameStatePayload = {
+  orbs: (Position & { id: string; triggered: boolean; collectedBy?: string })[];
   currentUnitID: string; roundCounter: number; roundTurn: number;
   roundOrder: { playerID: string; unitID: string }[];
   id: string; players: Record<string, Player>; board: Cell[];

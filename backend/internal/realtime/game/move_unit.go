@@ -36,6 +36,8 @@ func (s *GameSession) MovePiece(id uuid.UUID, unitID string, to models.Position)
 		unit.MovementMode = ""
 		unit.Position = to
 		unit.CurrentStamina -= cost
+		s.collectOrbs(unit, path)
+		s.spawnMilestoneOrbs()
 		s.changed()
 		return nil
 	}

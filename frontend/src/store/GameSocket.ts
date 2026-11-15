@@ -5,6 +5,7 @@ import { GameSocket, MessageType, type ConnectionStatus } from "@/api/webSocket/
 import { canUnitAttack, isAttackTarget, isBarricadeTarget } from "@/internal/game/combat";
 
 const emptyGame: GameStatePayload = {
+  orbs: [],
   currentUnitID: "", roundCounter: 0, roundTurn: 0, roundOrder: [],
   id: "", players: {}, board: [], turnOrder: [], currentTurn: null,
   turnCounter: 0, status: "waiting", winner: null, revision: -1,

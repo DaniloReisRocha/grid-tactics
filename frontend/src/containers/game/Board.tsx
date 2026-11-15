@@ -7,12 +7,15 @@ import { movementOptions, positionKey } from "@/internal/game/pathfinding";
 import { playerAppearance } from "@/internal/game/appearance";
 import { canUnitAttack, isAttackTarget, isBarricadeTarget } from "@/internal/game/combat";
 import { labAbilityProblem,combatSkillToken,abilityArea } from "@/internal/game/abilities";
+import { useGameOrbs } from "./useGameOrbs";
+import { EffectID } from "@/internal/game/effects";
 
 export const Board = () => {
-  const { id, board, players, turnOrder, unitID, setUnit, movePiece, attackPiece, attackMode,
+  const { id, board, players, orbs, turnOrder, unitID, setUnit, movePiece, attackPiece, attackMode,
     accountID, currentTurn, currentUnitID, pending, status, connection,skillMode,activateAbility,matchAbilityUses } = useGameSocket();
   const [hovered, setHovered] = useState<MapTile | null>(null);
   const units = useMemo(() => Object.values(players).flatMap((player) => player.units), [players]);
+  const orbView = useGameOrbs(orbs, units);
   const lookup = useMemo(() => new Map(board.map((tile) => [positionKey(tile), tile])), [board]);
   const selected = units.find((unit) => unit.unit.id === unitID);
   const skillTokens=useMemo(()=>units.map(combatSkillToken),[units]);
@@ -33,7 +36,11 @@ export const Board = () => {
     for (const tile of board) if (isBarricadeTarget(selected,tile,board)) attackTargets.add(positionKey(tile));
   }
   const selectable = new Set<string>(attackMode || skillMode ? [] : living.keys());
-  if (canAct&&skillMode) for(const tile of board) { if(!labAbilityProblem(selectedToken,activeSkill,board,skillTokens,matchAbilityUses??{},tile))selectable.add(positionKey(tile)); }
+  if (canAct&&skillMode) for(const tile of board) {
+    const orbBlocksStructure = activeSkill?.effect.some((effect) => effect.id === EffectID.createBarricade)
+      && orbs.some((orb) => !orb.triggered && orb.x === tile.x && orb.y === tile.y);
+    if(!orbBlocksStructure&&!labAbilityProblem(selectedToken,activeSkill,board,skillTokens,matchAbilityUses??{},tile))selectable.add(positionKey(tile));
+  }
   if (canAct && !attackMode) for (const key of options?.paths.keys() ?? []) selectable.add(key);
   for (const key of attackTargets) selectable.add(key);
   const preview = hovered && !attackMode && !skillMode ? options?.paths.get(positionKey(hovered)) : undefined;
@@ -61,11 +68,13 @@ export const Board = () => {
       key={id}
       width={width} height={height}
       tiles={board} actors={actors}
+      orbs={orbView.orbs} onOrbComplete={orbView.onOrbComplete}
       style={{ flex: "1 1 650px", minWidth: 0, height: "max(540px, calc(100vh - 140px))", borderRadius: 12 }}
       interaction={{
         path: previewPath, selectable, attackTargets,
         area:skillMode&&hovered&&selectable.has(positionKey(hovered))?abilityArea(activeSkill,hovered,board):[],
         onHover: setHovered,
+        onActorTileEnter: orbView.onActorTileEnter,
         onSelect: (tile) => {
           const key = positionKey(tile);
           const unit = living.get(key);

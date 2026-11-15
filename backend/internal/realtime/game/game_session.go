@@ -21,6 +21,7 @@ type PlayerState struct {
 }
 
 type GameSession struct {
+	Orbs             []models.Orb
 	RoundOrder       []models.UnitTurn
 	RoundCounter     int
 	RoundTurn        int
@@ -86,6 +87,7 @@ func (s *GameSession) BroadcastState() error {
 		winner = &id
 	}
 	payload := models.GameStatePayload{
+		Orbs:       append([]models.Orb{}, s.Orbs...),
 		RoundOrder: append([]models.UnitTurn{}, s.RoundOrder...), RoundCounter: s.RoundCounter,
 		RoundTurn: s.RoundTurn, CurrentUnitID: s.CurrentUnitID,
 		ID: s.ID, Players: players, Board: append([]models.Cell{}, s.Board...),

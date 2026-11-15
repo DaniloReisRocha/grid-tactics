@@ -203,6 +203,123 @@ func TestSocketRejectsUnlistedOrigin(t *testing.T) {
 	}
 }
 
+func TestOrbSpawnCollectionAndReconnectAreSynchronized(t *testing.T) {
+	manager := game.NewSessionManager()
+	session := manager.CreateSession("orb-socket")
+	roster := &GameUnitsGetService{}
+	a, b := uuid.Must(uuid.NewV4()), uuid.Must(uuid.NewV4())
+	// Prepare the fixture before opening sockets; no goroutine owns it yet.
+	for _, owner := range []uuid.UUID{a, b} {
+		units, err := roster.Run(owner)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := session.AddPlayer(nil, owner, units); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := range session.Board {
+		session.Board[i].Height = 0
+		session.Board[i].Terrain = models.TerrainGrass
+		session.Board[i].Object = models.ObjectNone
+	}
+	for _, owner := range []uuid.UUID{a, b} {
+		for i := range session.Players[owner].Units {
+			if session.Players[owner].Units[i].Unit.ID != session.CurrentUnitID {
+				session.Players[owner].Units[i].CurrentLife = 0
+				break
+			}
+		}
+	}
+	if err := session.EndTurn(*session.CurrentTurn); err != nil {
+		t.Fatal(err)
+	}
+	if len(session.Orbs) != 1 {
+		t.Fatal("missing milestone fixture")
+	}
+	orb := session.Orbs[0]
+	owner := *session.CurrentTurn
+	var actor *models.UnitInstance
+	occupied := map[models.Position]bool{}
+	for _, player := range session.Players {
+		for i := range player.Units {
+			unit := &player.Units[i]
+			occupied[unit.Position] = true
+			if unit.Unit.ID == session.CurrentUnitID {
+				actor = unit
+			}
+		}
+	}
+	found := false
+	for _, delta := range []models.Position{{X: 1}, {X: -1}, {Y: 1}, {Y: -1}} {
+		position := models.Position{X: orb.X + delta.X, Y: orb.Y + delta.Y}
+		if position.X >= 0 && position.X < 15 && position.Y >= 0 && position.Y < 15 && !occupied[position] {
+			actor.Position = position
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("no adjacent fixture slot")
+	}
+	shield, _ := models.AbilityByID(models.AbilityShieldID)
+	grenade, _ := models.AbilityByID(models.AbilityGrenadeID)
+	actor.Unit.Abilities = []models.Ability{shield, grenade}
+	actor.CurrentShield = 0
+	actor.AbilityUses = map[string]int{grenade.ID: 1}
+	actorID := actor.Unit.ID
+	svc := GameWsService{Sessions: manager, GetUnits: roster.Run}
+	server := httptest.NewServer(http.HandlerFunc(svc.Receive))
+	defer server.Close()
+	dial := func() *websocket.Conn {
+		t.Helper()
+		conn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http"), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return conn
+	}
+	join := func(conn *websocket.Conn, id uuid.UUID) {
+		sendAction(t, conn, joinGame, joinGameAction{SessionID: "orb-socket", AccoID: id.String()})
+	}
+	clients := map[uuid.UUID]*websocket.Conn{a: dial(), b: dial()}
+	defer clients[a].Close()
+	defer clients[b].Close()
+	join(clients[a], a)
+	readState(t, clients[a], "playing")
+	join(clients[b], b)
+	one, two := readState(t, clients[a], "playing"), readState(t, clients[b], "playing")
+	if len(one.Orbs) != 1 || !reflect.DeepEqual(one.Orbs, two.Orbs) || one.Orbs[0].Triggered {
+		t.Fatal("spawn not synchronized")
+	}
+	sendAction(t, clients[owner], movePiece, movePieceAction{UnitID: actorID, To: orb.Position})
+	one, two = readState(t, clients[a], "playing"), readState(t, clients[b], "playing")
+	if !reflect.DeepEqual(one.Orbs, two.Orbs) || !one.Orbs[0].Triggered || one.Orbs[0].CollectedBy != actorID {
+		t.Fatal("collection not synchronized")
+	}
+	for _, state := range []models.GameStatePayload{one, two} {
+		for _, unit := range state.Players[owner].Units {
+			if unit.Unit.ID == actorID && (unit.CurrentShield != 3 || unit.AbilityUses[grenade.ID] != 0) {
+				t.Fatal("ability restoration not synchronized")
+			}
+		}
+	}
+	other := a
+	if owner == a {
+		other = b
+	}
+	clients[owner].Close()
+	readState(t, clients[other], "paused")
+	reconnected := dial()
+	defer reconnected.Close()
+	join(reconnected, owner)
+	state := readState(t, reconnected, "playing")
+	readState(t, clients[other], "playing")
+	if !reflect.DeepEqual(state.Orbs, one.Orbs) {
+		t.Fatal("reconnect reset orb state")
+	}
+}
+
 func TestSelectedTeamAndPassivePersistOnWebSocketReconnect(t *testing.T) {
 	roster := &GameUnitsGetService{}
 	svc := GameWsService{Sessions: game.NewSessionManager(), GetUnits: roster.Run}

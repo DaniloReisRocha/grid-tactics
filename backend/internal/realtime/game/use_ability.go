@@ -24,6 +24,11 @@ func (s *GameSession) UseAbility(id uuid.UUID, unitID, abilityID string, target 
 	if actor == nil || actor.CurrentLife <= 0 {
 		return errors.New("unidade inválida ou eliminada")
 	}
+	ability, _ := models.AbilityByID(abilityID)
+	if ability.HasEffect(models.EffectCreateBarricadeID) && s.activeOrbAt(target) {
+		return errors.New("o terreno está ocupado por uma orb")
+	}
+	from := actor.Position
 	input := models.SkillsLabAbility{Board: s.Board, ActorID: unitID, AbilityID: abilityID, Target: target, MatchAbilityUses: s.MatchAbilityUses}
 	for _, player := range s.Players {
 		for _, unit := range player.Units {
@@ -58,6 +63,9 @@ func (s *GameSession) UseAbility(id uuid.UUID, unitID, abilityID string, target 
 	}
 	s.Board = result.Board
 	s.MatchAbilityUses = result.MatchAbilityUses
+	if actor.Position != from {
+		s.collectOrbs(actor, []models.Position{actor.Position})
+	}
 	aliveTeams := []uuid.UUID{}
 	for owner, player := range s.Players {
 		for _, unit := range player.Units {
@@ -81,6 +89,7 @@ func (s *GameSession) UseAbility(id uuid.UUID, unitID, abilityID string, target 
 	if s.Status == "playing" && actor.CurrentLife <= 0 {
 		s.advanceUnitTurn()
 	}
+	s.spawnMilestoneOrbs()
 	s.changed()
 	return nil
 }

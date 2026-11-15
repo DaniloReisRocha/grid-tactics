@@ -14,6 +14,7 @@ func (s *GameSession) EndTurn(id uuid.UUID) error {
 		return err
 	}
 	s.advanceUnitTurn()
+	s.spawnMilestoneOrbs()
 	s.changed()
 	return nil
 }

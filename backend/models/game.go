@@ -56,6 +56,7 @@ type UnitTurn struct {
 }
 
 type GameStatePayload struct {
+	Orbs             []Orb                 `json:"orbs"`
 	RoundOrder       []UnitTurn            `json:"roundOrder"`
 	RoundCounter     int                   `json:"roundCounter"`
 	RoundTurn        int                   `json:"roundTurn"`

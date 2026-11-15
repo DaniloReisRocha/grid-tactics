@@ -81,6 +81,7 @@ func (s *GameSession) Attack(id uuid.UUID, unitID string, target models.Position
 					defender.Path = path
 					defender.MovementMode = ""
 					defender.Position = path[len(path)-1]
+					s.collectOrbs(defender, path[1:])
 				}
 			}
 			attacker.HasAttacked = true
@@ -98,6 +99,7 @@ func (s *GameSession) Attack(id uuid.UUID, unitID string, target models.Position
 				s.CurrentTurn = nil
 				s.CurrentUnitID = ""
 			}
+			s.spawnMilestoneOrbs()
 			s.changed()
 			return nil
 		}

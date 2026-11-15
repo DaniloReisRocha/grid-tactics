@@ -26,7 +26,7 @@ export const Game = ({ sessionID, accoID }: GameProps) => {
       {status === "waiting" ? <WaitingScreen count={connected} /> : (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 20, marginTop: 16, alignItems: "flex-start" }}>
           <TurnControl />
-          <Board />
+          <Board key={sessionID} />
           <PieceInfoPanel />
         </div>
       )}

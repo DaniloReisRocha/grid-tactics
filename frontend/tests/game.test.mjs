@@ -38,6 +38,43 @@ test("orbs loop only spawn frames and finish their burst exactly once", () => {
   }
 });
 
+test("game orbs wait for their collector's arrival and stay hidden after reconnecting", () => {
+  const harness = () => {
+    const hooks = []; let cursor = 0; let effects = [];
+    const react = {
+      useRef(value) { const index = cursor++; return hooks[index] ??= {current:value}; },
+      useState(initial) {
+        const index = cursor++;
+        if (!(index in hooks)) hooks[index] = typeof initial === "function" ? initial() : initial;
+        return [hooks[index],value => { hooks[index] = typeof value === "function" ? value(hooks[index]) : value; }];
+      },
+      useEffect(callback) { effects.push(callback); }, useCallback(callback) { return callback; },
+    };
+    const {useGameOrbs} = compile("containers/game/useGameOrbs.ts",{require:()=>react});
+    return (orbs,units=[]) => {
+      cursor=0; const view=useGameOrbs(orbs,units);
+      const pending=effects; effects=[]; pending.forEach(callback=>callback());
+      return view;
+    };
+  };
+  const render = harness();
+  const waiting = [{id:"orb-4",x:2,y:3,triggered:false}];
+  assert.equal(render(waiting).orbs[0].triggered,false);
+  const collected = [{...waiting[0],triggered:true,collectedBy:"collector"}];
+  let view = render(collected);
+  assert.equal(view.orbs[0].triggered,false);
+  view.onActorTileEnter({x:2,y:3},"other");
+  assert.equal(render(collected).orbs[0].triggered,false);
+  view.onActorTileEnter({x:2,y:3},"collector");
+  view=render(collected);
+  assert.equal(view.orbs[0].triggered,true);
+  view.onOrbComplete("orb-4");
+  assert.equal(render(collected).orbs.length,0);
+  const reconnect = harness();
+  assert.equal(reconnect(collected).orbs.length,0);
+  assert.equal(reconnect(collected).orbs.length,0);
+});
+
 test("opposite camera reverses depth and projection on rectangular maps without mutating world coordinates", () => {
   const { viewPosition, projectPosition, viewDepth } = compile("components/ProceduralMap/projection.ts");
   const normal = { width: 9, height: 5, reversed: false };
