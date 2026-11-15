@@ -1,5 +1,5 @@
 import type { Cell, UnitInstance } from "@/api/models";
-import { weaponEffectProblem } from "./effects";
+import { directAttackProblem } from "./attackLine";
 
 /** Attack allowance is independent of stamina; weapon penalties reduce movement capacity only. */
 export function canUnitAttack(unit: UnitInstance) {
@@ -33,10 +33,8 @@ export function isAttackTarget(
   const dy = Math.abs(target.y - attacker.y);
   const aligned = dx === 0 || dy === 0;
   const distance = dx + dy;
-  const from = board.find((tile) => tile.x === attacker.x && tile.y === attacker.y);
-  const to = board.find((tile) => tile.x === target.x && tile.y === target.y);
   const allowed = aligned && distance <= attacker.unit.weapons[0].range
-    && !weaponEffectProblem(attacker.unit.weapons[0], distance, from?.height, to?.height);
+    && !directAttackProblem(attacker,target,attacker.unit.weapons[0],board);
   if ((target?.x ?? 0) === 5 && (target?.y ?? 0) === 6) {
     console.log("distance => ", distance);
     console.log("range => ", attacker.unit.weapons[0].range);
@@ -44,4 +42,9 @@ export function isAttackTarget(
   }
 
   return allowed;
+}
+
+export function isBarricadeTarget(attacker: UnitInstance,tile: Cell,board: readonly Cell[]) {
+  return tile.object === "barricade" && canUnitAttack(attacker)
+    && !directAttackProblem(attacker,tile,attacker.unit.weapons[0],board);
 }

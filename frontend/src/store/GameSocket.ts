@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { GameStatePayload } from "@/api/models";
 import { GameSocket, MessageType, type ConnectionStatus } from "@/api/webSocket/GameSocket";
-import { canUnitAttack, isAttackTarget } from "@/internal/game/combat";
+import { canUnitAttack, isAttackTarget, isBarricadeTarget } from "@/internal/game/combat";
 
 const emptyGame: GameStatePayload = {
   id: "", players: {}, board: [], turnOrder: [], currentTurn: null,
@@ -49,7 +49,8 @@ export const gameStore = create<GameStore>((set, get) => {
       const target = Object.values(state.players).flatMap((player) => player.units)
         .find((unit) => unit.x === x && unit.y === y && unit.currentLife > 0);
       // An empty/invalid slot must not send an action or change attack mode/pending state.
-      if (!attacker || !isAttackTarget(attacker, target, state.board)) return;
+      const tile=state.board.find((cell)=>cell.x===x&&cell.y===y);
+      if (!attacker || (!isAttackTarget(attacker,target,state.board) && !(tile&&isBarricadeTarget(attacker,tile,state.board)))) return;
       act(MessageType.attackPiece, { unitID, to: { x, y } });
     },
     endTurn: () => act(MessageType.endTurn),

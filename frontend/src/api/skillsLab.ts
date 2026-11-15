@@ -18,7 +18,7 @@ export interface SkillToken extends Position {
 }
 
 export interface LabConfig { board: Cell[]; weapons: Weapon[]; abilities: Ability[]; baseStamina: number }
-export interface LabResult { tokens: SkillToken[]; message: string }
+export interface LabResult { board: Cell[]; tokens: SkillToken[]; message: string }
 export interface LabAbilityResult extends LabResult { board: Cell[]; matchAbilityUses: Record<string, number> }
 export type LabLayout = "arena" | "procedural";
 
@@ -51,12 +51,12 @@ export function loadLab(seed: string, layout: LabLayout, signal: AbortSignal) {
   return request<LabConfig>(url, { signal });
 }
 
-export function attackInLab(board: Cell[], tokens: SkillToken[], attackerID: string, targetID: string, signal: AbortSignal) {
+export function attackInLab(board: Cell[], tokens: SkillToken[], attackerID: string, targetID: string | undefined, signal: AbortSignal, target?: Position) {
   const url = labURL();
   url.pathname += "/attack";
   return request<LabResult>(url, {
     method: "POST", signal, headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ board, tokens, attackerID, targetID }),
+    body: JSON.stringify({ board, tokens, attackerID, targetID, target }),
   });
 }
 

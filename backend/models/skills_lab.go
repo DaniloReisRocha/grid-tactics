@@ -32,9 +32,11 @@ type SkillsLabAttack struct {
 	Tokens     []SkillToken `json:"tokens"`
 	AttackerID string       `json:"attackerID"`
 	TargetID   string       `json:"targetID"`
+	Target     *Position    `json:"target,omitempty"`
 }
 
 type SkillsLabResult struct {
+	Board   []Cell       `json:"board"`
 	Tokens  []SkillToken `json:"tokens"`
 	Message string       `json:"message"`
 }

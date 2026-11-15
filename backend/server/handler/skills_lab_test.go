@@ -97,3 +97,24 @@ func TestSkillsLabAbilityEndpointPreservesUsage(t *testing.T) {
 		input.Board, input.Tokens, input.MatchAbilityUses = result.Board, result.Tokens, result.MatchAbilityUses
 	}
 }
+
+func TestSkillsLabAttackCanTargetAndRemoveBarricade(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	h := SkillsLabHandler{}
+	method, path, handler := h.Attack().NewEndpoint()
+	router.Handle(method, path, handler)
+	point := models.Position{X: 2, Y: 1}
+	input := models.SkillsLabAttack{AttackerID: "a", Target: &point, Board: []models.Cell{
+		{X: 1, Y: 1, Terrain: models.TerrainGrass}, {X: 2, Y: 1, Terrain: models.TerrainGrass, Object: models.ObjectBarricade},
+	}, Tokens: []models.SkillToken{{ID: "a", Position: models.Position{X: 1, Y: 1}, Life: 3, WeaponID: models.WeaponPistolID}}}
+	body, _ := json.Marshal(input)
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/skills-lab/attack", bytes.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(response, request)
+	var result models.SkillsLabResult
+	if response.Code != http.StatusOK || json.Unmarshal(response.Body.Bytes(), &result) != nil || len(result.Board) != 2 || result.Board[1].Object != models.ObjectNone || result.Tokens[0].Life != 3 {
+		t.Fatalf("invalid barricade response: %s", response.Body.String())
+	}
+}

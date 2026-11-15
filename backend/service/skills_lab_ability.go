@@ -157,6 +157,17 @@ func ResolveSkillsLabAbility(input models.SkillsLabAbility) (models.SkillsLabAbi
 			hits++
 		}
 		result.Message = fmt.Sprintf("Granada detonada: %d unidade(s) atingida(s), incluindo aliadas na área.", hits)
+		destroyed := 0
+		for i := range result.Board {
+			cell := &result.Board[i]
+			if cell.Object == models.ObjectBarricade && abs(cell.X-input.Target.X) <= radius && abs(cell.Y-input.Target.Y) <= radius {
+				cell.Object = models.ObjectNone
+				destroyed++
+			}
+		}
+		if destroyed > 0 {
+			result.Message += fmt.Sprintf(" %d barricada(s) destruída(s).", destroyed)
+		}
 	}
 	unit.AbilityUses[ability.ID]++
 	result.MatchAbilityUses[ability.ID] = matchCount + 1

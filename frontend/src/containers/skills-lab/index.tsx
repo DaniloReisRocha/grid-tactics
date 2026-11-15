@@ -96,6 +96,9 @@ export default function SkillsLab() {
   if (tool === "attack" && selected) for (const target of tokens) {
     if (!labAttackProblem(selected, target, board, weapons)) attackTargets.add(positionKey(target));
   }
+  if (tool === "attack" && selected) for (const tile of board) {
+    if (tile.object==="barricade"&&!labAttackProblem(selected,undefined,board,weapons,tile)) attackTargets.add(positionKey(tile));
+  }
   const selectable = new Set<string>();
   if (!pending) for (const tile of board) {
     const key = positionKey(tile);
@@ -151,13 +154,13 @@ export default function SkillsLab() {
     if (tool === "skill" && activeAbilityID) { await performAbility(activeAbilityID,tile); return; }
     if (tool === "attack") {
       if (!selected) { setError("Selecione o atacante na lista de tokens."); return; }
-      const problem = labAttackProblem(selected, token, board, weapons);
-      if (problem || !token) { setError(problem); return; }
+      const problem = labAttackProblem(selected, token, board, weapons,tile);
+      if (problem) { setError(problem); return; }
       const controller = new AbortController();
       activeRequest.current = controller; busy.current = true; setPending(true);
       try {
-        const result = await attackInLab(board, tokens, selected.id, token.id, controller.signal);
-        if (!controller.signal.aborted) { setTokens(result.tokens); addLog(result.message); }
+        const result = await attackInLab(board, tokens, selected.id, token?.id, controller.signal,tile);
+        if (!controller.signal.aborted) { setTokens(result.tokens); setConfig((current)=>current?{...current,board:result.board}:current); addLog(result.message); }
       } catch (cause) { if (!controller.signal.aborted) setError(errorText(cause)); }
       finally { if (activeRequest.current === controller) { busy.current = false; setPending(false); } }
       return;

@@ -90,6 +90,8 @@ Granada permite escolher seu centro até dois terrenos adiante, na mesma linha o
 
 `POST /api/skills-lab/ability` aplica os efeitos pelo ID de `Effect`, valida o cenário e retorna cópias do mapa, tokens e contadores. Alvos inválidos não consomem uso. As habilidades de uso único registram o consumo por unidade; trocar de habilidade, atacar, restaurar recursos ou recuperar estamina não renova esse uso. **Reiniciar cenário** ou gerar um novo mapa renova todos os usos. A ativação está conectada ao laboratório; o multiplayer ainda não possui comando de uso de habilidades.
 
+Casas, ruínas e barricadas bloqueiam a linha dos ataques diretos, tanto no multiplayer quanto no laboratório. Árvores e rochas não bloqueiam disparos. Uma unidade protegida por uma estrutura não aparece como alvo válido. Barricadas podem ser selecionadas diretamente em **Testar ataque** ou **Atacar**: um golpe as remove e libera o terreno, sem dano à unidade atrás delas. No multiplayer, destruir uma barricada consome o ataque do turno. Não é possível destruir uma barricada através de outra estrutura. A área da granada também destrói as barricadas que atingir; casas e ruínas permanecem no mapa.
+
 ## Verificações
 
 No frontend:

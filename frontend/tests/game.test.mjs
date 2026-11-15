@@ -134,6 +134,25 @@ test("ability previews enforce usage, cardinal targets, height, and the grenade 
   assert.equal(abilityArea(grenade,{x:0,y:0},board).length,4);
 });
 
+test("direct attack previews respect cover and allow targeting barricades without a unit", () => {
+  const {isAttackTarget,isBarricadeTarget}=compile("internal/game/combat.ts");
+  const {labAttackProblem}=compile("internal/game/skillsLab.ts");
+  const weapon={id:"pistol",range:2,effect:[]};
+  const attacker={x:0,y:0,ownerID:"a",currentLife:3,hasAttacked:false,unit:{weapons:[weapon]}};
+  const target={...attacker,x:2,ownerID:"b"};
+  const board=[0,1,2].map(x=>({x,y:0,height:0,terrain:"grass"}));
+  for (const object of ["house","ruin","barricade"]) {
+    board[1].object=object;
+    assert.equal(isAttackTarget(attacker,target,board),false);
+    assert.ok(labAttackProblem({x:0,y:0,life:3,team:0,weaponID:"pistol"},{x:2,y:0,life:3,team:1},board,[weapon]));
+    assert.equal(isBarricadeTarget(attacker,board[1],board),object==="barricade");
+  }
+  assert.equal(labAttackProblem({x:0,y:0,life:3,team:0,weaponID:"pistol"},undefined,board,[weapon],{x:1,y:0}),null);
+  board[1].object=undefined;
+  assert.equal(isAttackTarget(attacker,target,board),true);
+  for (const object of ["tree","forest","rock"]) { board[1].object=object;assert.equal(isAttackTarget(attacker,target,board),true); }
+});
+
 test("reusable negative effects control multiplayer and lab previews independently of weapon ID", () => {
   const { weaponEffectProblem } = compile("internal/game/effects.ts");
   const { isAttackTarget } = compile("internal/game/combat.ts");
@@ -299,6 +318,10 @@ test("empty slots do not send attacks, consume allowance or exit attack mode", (
   assert.equal(sent.length,1);
   assert.equal(sent[0].type,"attackPiece");
   assert.equal(gameStore.getState().pending,true);
+  gameStore.setState({pending:false,board:[{x:0,y:0,height:0,terrain:"grass"},{x:0,y:1,height:0,terrain:"grass",object:"barricade"}]});
+  gameStore.getState().attackPiece("a1",0,1);
+  assert.equal(sent.length,2);
+  assert.equal(sent[1].payload.to.y,1);
 });
 
 test("each player has a distinct stable character model from the three sheet blocks", () => {

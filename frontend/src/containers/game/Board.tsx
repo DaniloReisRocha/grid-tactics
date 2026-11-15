@@ -5,7 +5,7 @@ import type { MapActor } from "@/components/ProceduralMap/types";
 import { useGameSocket } from "@/store/GameSocket";
 import { movementOptions, positionKey } from "@/internal/game/pathfinding";
 import { playerAppearance } from "@/internal/game/appearance";
-import { canUnitAttack, isAttackTarget } from "@/internal/game/combat";
+import { canUnitAttack, isAttackTarget, isBarricadeTarget } from "@/internal/game/combat";
 
 export const Board = () => {
   const { id, board, players, turnOrder, unitID, setUnit, movePiece, attackPiece, attackMode,
@@ -25,8 +25,9 @@ export const Board = () => {
         attackTargets.add(positionKey(unit));
       }
     }
+    for (const tile of board) if (isBarricadeTarget(selected,tile,board)) attackTargets.add(positionKey(tile));
   }
-  const selectable = new Set<string>(living.keys());
+  const selectable = new Set<string>(attackMode ? [] : living.keys());
   if (canAct && !attackMode) for (const key of options?.paths.keys() ?? []) selectable.add(key);
   for (const key of attackTargets) selectable.add(key);
   const preview = hovered && !attackMode ? options?.paths.get(positionKey(hovered)) : undefined;
@@ -60,7 +61,7 @@ export const Board = () => {
           const key = positionKey(tile);
           const unit = living.get(key);
           if (attackMode) {
-            if (unit && attackTargets.has(key) && selected) {
+            if (attackTargets.has(key) && selected) {
               attackPiece(selected.unit.id, tile.x, tile.y);
             }
             return;

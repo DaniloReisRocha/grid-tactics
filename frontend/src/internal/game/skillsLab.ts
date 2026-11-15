@@ -1,15 +1,17 @@
-import type { Cell, UnitInstance, Weapon } from "@/api/models";
+import type { Cell, Position, UnitInstance, Weapon } from "@/api/models";
 import type { SkillToken } from "@/api/skillsLab";
 import { isWalkable } from "@/components/ProceduralMap/characterMovement";
-import { weaponEffectProblem } from "./effects";
+import { directAttackProblem } from "./attackLine";
 import { effectiveStamina } from "./stamina";
 
-export function labAttackProblem(attacker: SkillToken, target: SkillToken | undefined, board: Cell[], weapons: Weapon[]) {
+export function labAttackProblem(attacker: SkillToken, target: SkillToken | undefined, board: Cell[], weapons: Weapon[], position?: Position) {
   if (attacker.life <= 0) return "Escolha um atacante vivo.";
+  const point=position??target;
+  const weapon=weapons.find((item)=>item.id===attacker.weaponID);
+  if (!weapon) return "Equipe uma arma no atacante.";
+  if (point && board.some((tile)=>tile.x===point.x&&tile.y===point.y&&tile.object==="barricade")) return directAttackProblem(attacker,point,weapon,board);
   if (!target || target.life <= 0) return "Clique em um token vivo da outra equipe.";
   if (attacker.team === target.team) return "Escolha um alvo da outra equipe.";
-  const weapon = weapons.find((item) => item.id === attacker.weaponID);
-  if (!weapon) return "Equipe uma arma no atacante.";
   const dx = Math.abs(target.x - attacker.x);
   const dy = Math.abs(target.y - attacker.y);
   if (dx !== 0 && dy !== 0) return "O alvo precisa estar na mesma linha ou coluna do atacante.";
@@ -18,7 +20,7 @@ export function labAttackProblem(attacker: SkillToken, target: SkillToken | unde
   const from = board.find((tile) => tile.x === attacker.x && tile.y === attacker.y);
   const to = board.find((tile) => tile.x === target.x && tile.y === target.y);
   if (!from || !to) return "Token fora do mapa.";
-  return weaponEffectProblem(weapon, distance, from.height, to.height);
+  return directAttackProblem(attacker,target,weapon,board);
 }
 
 // Adapt creative tokens to the same movement/path preview used in a real game.

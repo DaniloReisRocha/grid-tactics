@@ -55,15 +55,32 @@ func ResolveSkillsLabAttack(input models.SkillsLabAttack) (models.SkillsLabResul
 			targetIndex = i
 		}
 	}
-	if attackerIndex < 0 || targetIndex < 0 {
+	if input.Target != nil {
+		targetIndex = -1
+		for i, token := range input.Tokens {
+			if token.Position == *input.Target && token.Life > 0 {
+				targetIndex = i
+				break
+			}
+		}
+	}
+	if attackerIndex < 0 || (targetIndex < 0 && input.Target == nil) {
 		return result, errors.New("selecione um atacante e um alvo")
 	}
-	attacker, target := input.Tokens[attackerIndex], input.Tokens[targetIndex]
-	if attacker.Life <= 0 || target.Life <= 0 || attacker.Team == target.Team {
-		return result, errors.New("o alvo precisa ser um token vivo da outra equipe")
+	attacker := input.Tokens[attackerIndex]
+	if attacker.Life <= 0 {
+		return result, errors.New("escolha um atacante vivo")
+	}
+	var target models.SkillToken
+	if targetIndex >= 0 {
+		target = input.Tokens[targetIndex]
+	}
+	targetPosition := target.Position
+	if input.Target != nil {
+		targetPosition = *input.Target
 	}
 	weapon, _ := models.WeaponByID(attacker.WeaponID)
-	dx, dy := target.X-attacker.X, target.Y-attacker.Y
+	dx, dy := targetPosition.X-attacker.X, targetPosition.Y-attacker.Y
 	abs := func(value int) int {
 		if value < 0 {
 			return -value
@@ -77,10 +94,29 @@ func ResolveSkillsLabAttack(input models.SkillsLabAttack) (models.SkillsLabResul
 	if distance > weapon.Range {
 		return result, errors.New("alvo fora do alcance da arma")
 	}
-	from, to := cells[attacker.Position], cells[target.Position]
+	from, to := cells[attacker.Position], cells[targetPosition]
 	if err := game.ValidateWeaponEffects(weapon, distance, from.Height, to.Height); err != nil {
 		return result, err
 	}
+	if !game.DirectAttackLineClear(attacker.Position, targetPosition, cells) {
+		return result, errors.New("uma estrutura bloqueia a linha de ataque")
+	}
+	if to.Object == models.ObjectBarricade {
+		result.Board = append([]models.Cell(nil), input.Board...)
+		result.Tokens = append([]models.SkillToken(nil), input.Tokens...)
+		for i := range result.Board {
+			if result.Board[i].X == targetPosition.X && result.Board[i].Y == targetPosition.Y {
+				result.Board[i].Object = models.ObjectNone
+				break
+			}
+		}
+		result.Message = "Barricada destruída. Nenhuma unidade atrás dela recebeu dano."
+		return result, nil
+	}
+	if targetIndex < 0 || target.Life <= 0 || attacker.Team == target.Team {
+		return result, errors.New("o alvo precisa ser um token vivo da outra equipe ou uma barricada")
+	}
+	result.Board = append([]models.Cell(nil), input.Board...)
 	result.Tokens = append([]models.SkillToken(nil), input.Tokens...)
 	defender := &result.Tokens[targetIndex]
 	oldLife, oldShield := defender.Life, defender.Shield

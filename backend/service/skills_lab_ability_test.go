@@ -92,6 +92,9 @@ func TestTrampolineCanLeapOverWaterOrClimbOneLevel(t *testing.T) {
 func TestGrenadeIncludesAlliesBreaksShieldWithoutOverflowAndHasMatchLimit(t *testing.T) {
 	input := abilityFixture(models.AbilityGrenadeID)
 	input.Target = models.Position{X: 6, Y: 5}
+	input.Board[5*15+6].Object = models.ObjectBarricade
+	input.Board[5*15+8].Object = models.ObjectBarricade
+	input.Board[4*15+7].Object = models.ObjectHouse
 	for _, token := range []models.SkillToken{
 		{ID: "friend", Team: 0, Position: models.Position{X: 6, Y: 4}, Life: 3, Shield: 1},
 		{ID: "enemy", Team: 1, Position: models.Position{X: 7, Y: 6}, Life: 2},
@@ -105,6 +108,9 @@ func TestGrenadeIncludesAlliesBreaksShieldWithoutOverflowAndHasMatchLimit(t *tes
 	result, err := ResolveSkillsLabAbility(input)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if result.Board[5*15+6].Object != models.ObjectNone || result.Board[5*15+8].Object != models.ObjectBarricade || result.Board[4*15+7].Object != models.ObjectHouse {
+		t.Fatal("grenade did not respect structure type or blast area")
 	}
 	if result.Tokens[0].Life != 1 || result.Tokens[1].Life != 3 || result.Tokens[1].Shield != 0 || result.Tokens[2].Life != 0 || result.Tokens[3].Life != 3 || result.Tokens[4].Life != 3 || result.Tokens[4].Shield != 0 {
 		t.Fatalf("invalid grenade result: %+v", result.Tokens)
