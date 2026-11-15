@@ -26,13 +26,13 @@ export function labAttackProblem(attacker: SkillToken, target: SkillToken | unde
 }
 
 // Adapt creative tokens to the same movement/path preview used in a real game.
-export function labStamina(token: SkillToken, weapons: Weapon[], baseStamina = 4) {
+export function labStamina(token: SkillToken, weapons: Weapon[], baseStamina = 5) {
   const equipped = weapons.filter((weapon) => weapon.id === token.weaponID);
   const max = effectiveStamina(baseStamina, equipped);
   return { max, current: Math.max(0, max - (token.staminaSpent ?? 0)) };
 }
 
-export function labMovementUnit(token: SkillToken, weapons: Weapon[], baseStamina = 4): UnitInstance {
+export function labMovementUnit(token: SkillToken, weapons: Weapon[], baseStamina = 5): UnitInstance {
   return {
     turnCount: token.turnCount ?? 1,
     x: token.x, y: token.y, player: token.team, ownerID: String(token.team),

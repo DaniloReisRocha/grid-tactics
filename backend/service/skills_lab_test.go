@@ -28,7 +28,7 @@ func TestLabWeaponEffectsAndRepeatedAttacks(t *testing.T) {
 		{models.WeaponShotgunID, 6, 6, 0, 6},
 		{models.WeaponSniperID, 9, 6, 0, 9},
 		{models.WeaponKatanaID, 5, 6, 0, 5},
-		{models.WeaponWarHammerID, 5, 6, 0, 6},
+		{models.WeaponWarHammerID, 5, 6, 1, 7},
 	} {
 		t.Run(test.weapon, func(t *testing.T) {
 			input := labFixture(test.weapon, test.x)
@@ -167,9 +167,10 @@ func TestLabHammerRespectsPushDestination(t *testing.T) {
 			}
 			wantX := 5
 			if obstacle == "downhill" {
-				wantX = 6
+				wantX = 7
 			}
-			if result.Tokens[1].X != wantX || result.Tokens[1].Shield != 0 {
+			weapon, _ := models.WeaponByID(models.WeaponWarHammerID)
+			if result.Tokens[1].X != wantX || result.Tokens[1].Shield != max(0, input.Tokens[1].Shield-weapon.Damage) {
 				t.Fatalf("incorrect push: %+v", result.Tokens[1])
 			}
 		})

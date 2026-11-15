@@ -3,7 +3,7 @@ package models
 const (
 	UnitBaseLife       = 3
 	UnitShieldCapacity = 3
-	UnitBaseStamina    = 4
+	UnitBaseStamina    = 5
 	UnitItemSlots      = 1
 	UnitAbilitySlots   = 2
 )

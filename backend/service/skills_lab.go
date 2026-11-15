@@ -126,11 +126,11 @@ func ResolveSkillsLabAttack(input models.SkillsLabAttack) (models.SkillsLabResul
 	defender.Life, defender.Shield = game.ApplyWeaponDamage(weapon, defender.Life, defender.Shield)
 	result.Message = fmt.Sprintf("%s: −%d de vida, −%d de escudo.", weapon.Name, oldLife-defender.Life, oldShield-defender.Shield)
 	if weapon.HasEffect(models.EffectKnockbackID) && defender.Life > 0 {
-		if destination, ok := game.WeaponKnockback(weapon, attacker.Position, target.Position, cells, occupied); ok {
-			defender.Position = destination
-			defender.Path = []models.Position{target.Position, destination}
+		if path := game.WeaponKnockback(weapon, attacker.Position, target.Position, cells, occupied); len(path) > 1 {
+			defender.Position = path[len(path)-1]
+			defender.Path = path
 			defender.MovementMode = ""
-			result.Message += " Alvo empurrado um bloco."
+			result.Message += fmt.Sprintf(" Alvo empurrado %d casa(s).", len(path)-1)
 		} else {
 			result.Message += " Empurrão bloqueado pelo terreno, borda ou outro token."
 		}

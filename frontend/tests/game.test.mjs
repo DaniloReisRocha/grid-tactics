@@ -76,7 +76,7 @@ test("skills lab previews weapon restrictions and reuses movement with limited s
   board.find((tile) => tile.x === 5 && tile.y === 5).height = 1;
   for (const id of ["katana", "warHammer"]) assert.ok(labAttackProblem({ ...attacker, weaponID: id }, target, board, weapons));
   const unit = labMovementUnit(attacker, weapons);
-  assert.equal(unit.currentStamina, 4);
+  assert.equal(unit.currentStamina, 5);
   assert.equal(unit.unit.weapons[0].id, "pistol");
   const starters = starterTokens(board, weapons);
   assert.equal(starters.length, 3);
@@ -96,22 +96,23 @@ test("weapon stamina penalties limit lab paths and preserve expenditure across e
     {id:"warHammer",staminaPenalty:2,range:1,effect:[]},
   ];
   const token = {id:"a",x:0,y:0,team:0,life:3,shield:0,maxLife:3,maxShield:3,weaponID:"pistol",staminaSpent:0,path:[]};
-  for (const [index,cap] of [4,3,2,4,2].entries()) assert.equal(labStamina({...token,weaponID:weapons[index].id},weapons).max,cap);
+  for (const [index,cap] of [5,4,3,5,3].entries()) assert.equal(labStamina({...token,weaponID:weapons[index].id},weapons).max,cap);
   const spent = {...token,staminaSpent:3};
-  assert.equal(labStamina(spent,weapons).current,1);
+  assert.equal(labStamina(spent,weapons).current,2);
   assert.equal(labStamina({...spent,weaponID:"sniper"},weapons).current,0);
-  assert.equal(labStamina({...spent,weaponID:"pistol"},weapons).current,1);
+  assert.equal(labStamina({...spent,weaponID:"pistol"},weapons).current,2);
   const board = Array.from({length:6},(_,x)=>({x,y:0,terrain:"grass",height:0}));
   const user = {...token,weaponID:"shotgun",staminaSpent:1};
   const unit = labMovementUnit(user,weapons);
   const options = movementOptions(board,unit,[unit]);
-  assert.equal(unit.currentStamina,2);
+  assert.equal(unit.currentStamina,3);
   assert.equal(options.paths.has("2,0"),true);
-  assert.equal(options.paths.has("3,0"),false);
+  assert.equal(options.paths.has("3,0"),true);
+  assert.equal(options.paths.has("4,0"),false);
   board[1].height = 1;
-  assert.equal(movementOptions(board,unit,[unit]).paths.has("2,0"),false);
+  assert.equal(movementOptions(board,unit,[unit]).paths.has("3,0"),false);
   assert.equal(labAttackProblem({...token,staminaSpent:4},{...token,id:"b",x:1,team:1},board,weapons),null);
-  assert.equal(labStamina({...token,weaponID:"sniper",staminaSpent:0},weapons).current,2);
+  assert.equal(labStamina({...token,weaponID:"sniper",staminaSpent:0},weapons).current,3);
 });
 
 test("passive shields apply on lab equipment once and cannot refill after damage", () => {

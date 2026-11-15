@@ -44,7 +44,7 @@ export const Home = () => {
       <header className="team-home-header"><div><span className="team-eyebrow">GRID TACTICS</span><h1>Prepare sua equipe</h1><p>Três unidades. Escolha o equipamento de cada uma e entre em combate.</p></div><Link to="/skills-lab">Laboratório de skills ↗</Link></header>
       <form className="team-home-layout" onSubmit={submit}>
         <section className="team-builder" aria-label="Montagem de equipe">
-          <div className="team-section-heading"><div><h2>Sua formação</h2><p>Vida 3 · Estamina base 4 · Escudo adquirido por habilidade</p></div><button type="button" disabled={loading} onClick={() => { setTeam(defaultTeam()); setError(null); }}>Restaurar equipe</button></div>
+          <div className="team-section-heading"><div><h2>Sua formação</h2><p>Vida 3 · Estamina base {options?.baseStamina ?? 5} · Escudo adquirido por habilidade</p></div><button type="button" disabled={loading} onClick={() => { setTeam(defaultTeam()); setError(null); }}>Restaurar equipe</button></div>
           {catalogError ? <div className="team-alert" role="alert">{catalogError}<button type="button" onClick={() => setRetry((value) => value + 1)}>Tentar novamente</button></div> : null}
           {loading ? <p className="team-loading" role="status">Carregando armas e habilidades…</p> : null}
           {options ? <fieldset className="team-cards" disabled={loading}><legend className="team-sr-only">Equipamentos das três unidades</legend>

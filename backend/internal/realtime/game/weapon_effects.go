@@ -28,13 +28,13 @@ func ApplyWeaponDamage(weapon models.Weapon, life, shield int) (int, int) {
 	return life, shield
 }
 
-func WeaponKnockback(weapon models.Weapon, attacker, target models.Position, cells map[models.Position]models.Cell, occupied map[models.Position]bool) (models.Position, bool) {
+func WeaponKnockback(weapon models.Weapon, attacker, target models.Position, cells map[models.Position]models.Cell, occupied map[models.Position]bool) []models.Position {
 	if !weapon.HasEffect(models.EffectKnockbackID) {
-		return target, false
+		return nil
 	}
 	dx, dy := target.X-attacker.X, target.Y-attacker.Y
 	if (dx == 0 && dy == 0) || (dx != 0 && dy != 0) {
-		return target, false
+		return nil
 	}
 	sign := func(value int) int {
 		if value < 0 {
@@ -45,11 +45,20 @@ func WeaponKnockback(weapon models.Weapon, attacker, target models.Position, cel
 		}
 		return 0
 	}
-	destination := models.Position{X: target.X + sign(dx), Y: target.Y + sign(dy)}
-	from, sourceExists := cells[target]
-	to, exists := cells[destination]
-	if !sourceExists || !exists || occupied[destination] || to.Height > from.Height || !CanTraverse(from, to) {
-		return target, false
+	path := []models.Position{target}
+	current := target
+	for step := 0; step < models.KnockbackDistance; step++ {
+		destination := models.Position{X: current.X + sign(dx), Y: current.Y + sign(dy)}
+		from, sourceExists := cells[current]
+		to, exists := cells[destination]
+		if !sourceExists || !exists || occupied[destination] || to.Height > from.Height || !CanTraverse(from, to) {
+			break
+		}
+		path = append(path, destination)
+		current = destination
 	}
-	return destination, true
+	if len(path) == 1 {
+		return nil
+	}
+	return path
 }

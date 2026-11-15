@@ -45,10 +45,10 @@ func TestEffectsCanBeCombinedAndReusedByAnotherWeapon(t *testing.T) {
 	cells := map[models.Position]models.Cell{
 		{X: 2}: {X: 2, Terrain: models.TerrainGrass}, {X: 3}: {X: 3, Terrain: models.TerrainGrass},
 	}
-	if next, ok := WeaponKnockback(weapon, models.Position{}, models.Position{X: 2}, cells, nil); !ok || next.X != 3 {
+	if path := WeaponKnockback(weapon, models.Position{}, models.Position{X: 2}, cells, nil); len(path) != 2 || path[1].X != 3 {
 		t.Fatal("reused knockback not applied")
 	}
-	if _, ok := WeaponKnockback(withoutEffects, models.Position{}, models.Position{X: 2}, cells, nil); ok {
+	if path := WeaponKnockback(withoutEffects, models.Position{}, models.Position{X: 2}, cells, nil); len(path) > 0 {
 		t.Fatal("knockback applied without effect")
 	}
 }
@@ -67,10 +67,65 @@ func TestMultiplayerUsesReusableEffects(t *testing.T) {
 	if err := s.Attack(a, "a", defender.Position); err != nil {
 		t.Fatal(err)
 	}
-	if defender.X != 3 || defender.CurrentShield != 0 || defender.CurrentLife != 6 || len(defender.Path) != 2 {
+	if defender.X != 4 || defender.CurrentShield != 0 || defender.CurrentLife != 6 || len(defender.Path) != 3 {
 		t.Fatalf("effects not applied to multiplayer: %+v", defender)
 	}
 	if !attacker.HasAttacked || attacker.CurrentStamina != 0 {
 		t.Fatal("effects changed attack or stamina rules")
+	}
+}
+
+func TestKnockbackTraversesTwoCellsAndStopsBeforeObstacles(t *testing.T) {
+	weapon, _ := models.WeaponByID(models.WeaponWarHammerID)
+	for _, direction := range []models.Position{{X: 1}, {X: -1}, {Y: 1}, {Y: -1}} {
+		for _, obstacle := range []string{"none", "edge", "water", "higher", "occupied", models.ObjectHouse, models.ObjectBarricade} {
+			for blockedStep := 1; blockedStep <= 2; blockedStep++ {
+				attacker := models.Position{X: 5, Y: 5}
+				at := func(step int) models.Position {
+					return models.Position{X: attacker.X + direction.X*step, Y: attacker.Y + direction.Y*step}
+				}
+				cells := map[models.Position]models.Cell{}
+				for step := 1; step <= 3; step++ {
+					p := at(step)
+					cells[p] = models.Cell{X: p.X, Y: p.Y, Terrain: models.TerrainGrass}
+				}
+				occupied := map[models.Position]bool{at(1): true}
+				blocked := at(blockedStep + 1)
+				cell := cells[blocked]
+				switch obstacle {
+				case "water":
+					cell.Terrain = models.TerrainWater
+				case "higher":
+					cell.Height = 1
+				case "occupied":
+					occupied[blocked] = true
+				case models.ObjectHouse, models.ObjectBarricade:
+					cell.Object = obstacle
+				}
+				cells[blocked] = cell
+				if obstacle == "edge" {
+					delete(cells, blocked)
+				}
+				path := WeaponKnockback(weapon, attacker, at(1), cells, occupied)
+				steps := blockedStep - 1
+				if obstacle == "none" {
+					steps = 2
+				}
+				if steps == 0 {
+					if len(path) != 0 {
+						t.Fatalf("pushed through first obstacle %s", obstacle)
+					}
+				} else {
+					if len(path) != steps+1 {
+						t.Fatalf("%s: got path %v for %d free steps", obstacle, path, steps)
+					}
+					for i, p := range path {
+						if p != at(i+1) {
+							t.Fatal("knockback skipped intermediate tile")
+						}
+					}
+				}
+			}
+		}
 	}
 }

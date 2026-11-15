@@ -81,7 +81,7 @@ export default function SkillsLab() {
   const weapons = useMemo(() => config?.weapons ?? [], [config]);
   const abilities = config?.abilities ?? [];
   const activeAbility = abilities.find((ability) => ability.id === activeAbilityID);
-  const baseStamina = config?.baseStamina ?? 4;
+  const baseStamina = config?.baseStamina ?? 5;
   const selected = tokens.find((token) => token.id === selectedID);
   const selectedWeapon = weapons.find((weapon) => weapon.id === selected?.weaponID);
   const selectedStamina = selected ? labStamina(selected, weapons, baseStamina) : null;

@@ -95,11 +95,11 @@ func WeaponOptions() []Weapon {
 			Effect:         []Effect{knockback, sameLevel},
 			Name:           "Martelo de Guerra",
 			Icon:           "🔨",
-			Damage:         3,
+			Damage:         2,
 			Range:          1,
-			StaminaPenalty: 2,
+			StaminaPenalty: 1,
 			ToolPenalty:    1,
-			Description:    "Empurra a unidade atingida um quadrado para trás. Só pode golpear unidades em terrenos do mesmo nível. Não é possível empurrar uma unidade para fora do mapa ou para um terreno mais alto.",
+			Description:    "Empurra a unidade atingida até dois quadrados para trás. Só pode golpear unidades em terrenos do mesmo nível. O empurrão para antes de obstáculos, bordas ou terrenos mais altos.",
 		},
 	}
 }

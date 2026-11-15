@@ -27,11 +27,11 @@ func TestTeamUsesServerCatalogAndDoesNotMutateStarterRoster(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, unit := range result {
-		if unit.ID != units[i].ID || unit.LP != 3 || unit.Shield != 3 || unit.Stamina != 4 || unit.Weapons[0].ID != team[i].WeaponID || len(unit.Abilities) != len(team[i].AbilityIDs) {
+		if unit.ID != units[i].ID || unit.LP != 3 || unit.Shield != 3 || unit.Stamina != models.UnitBaseStamina || unit.Weapons[0].ID != team[i].WeaponID || len(unit.Abilities) != len(team[i].AbilityIDs) {
 			t.Fatalf("invalid loadout: %+v", unit)
 		}
 		weapon, _ := models.WeaponByID(team[i].WeaponID)
-		if unit.Weapons[0].Damage != weapon.Damage || unit.EffectiveStamina() != 4-weapon.StaminaPenalty {
+		if unit.Weapons[0].Damage != weapon.Damage || unit.EffectiveStamina() != models.UnitBaseStamina-weapon.StaminaPenalty {
 			t.Fatal("weapon data did not come from catalog")
 		}
 	}

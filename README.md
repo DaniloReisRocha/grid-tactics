@@ -73,7 +73,7 @@ Abra `/skills-lab` pelo atalho na página inicial. Não é necessário criar con
 - Use **Editar terreno** para pintar slots vazios com grama, terra, água, casas, árvores ou rochas, nos níveis de 0 a 3.
 - A lista permite selecionar qualquer token, inclusive derrotados, para restaurar sua vida e escudo. Também é possível remover tokens, limpar a lista e reiniciar o cenário.
 
-O laboratório permite ataques repetidos, inclusive com estamina zero, e aplica as penalidades de estamina das armas. Com base 4, pistola e katana mantêm 4, escopeta permite 3, e sniper e martelo permitem 2. O gasto de movimento é preservado ao trocar de arma; recuperar estamina ou reiniciar o cenário permite repetir o teste. A penalidade de habilidades continua desativada. As simulações são isoladas das sessões multiplayer. O registro mostra o dano à vida, ao escudo e o resultado dos empurrões. O cenário é temporário e volta ao estado inicial ao recarregar a página.
+O laboratório permite ataques repetidos, inclusive com estamina zero, e aplica as penalidades de estamina das armas. Com base 5, pistola e katana mantêm 5, escopeta e sniper permitem 4, e martelo permite 3. O gasto de movimento é preservado ao trocar de arma; recuperar estamina ou reiniciar o cenário permite repetir o teste. A penalidade de habilidades continua desativada. As simulações são isoladas das sessões multiplayer. O registro mostra o dano à vida, ao escudo e o resultado dos empurrões. O cenário é temporário e volta ao estado inicial ao recarregar a página.
 
 ## Efeitos das armas
 
@@ -81,13 +81,15 @@ O laboratório permite ataques repetidos, inclusive com estamina zero, e aplica 
 
 `negative: true` identifica uma restrição para quem equipa a arma. Os efeitos continuam ativos: “sem ataques adjacentes” restringe a distância mínima, e “mesmo nível” restringe a altura do alvo. Katana e martelo compartilham a mesma definição de restrição de altura. Empurrão e quebra de escudo são efeitos positivos para quem ataca.
 
+O empurrão desloca o alvo vivo até duas casas para trás, validando cada passo e parando antes de obstáculos, outras unidades, bordas, água sem ponte ou subidas. Se apenas a primeira casa estiver livre, o alvo avança uma casa. A animação percorre as casas intermediárias, tanto no combate quanto no laboratório.
+
 O rifle sniper possui o efeito negativo reutilizável `reloadTurn`: no primeiro turno da própria unidade ela recarrega e não pode atacar; no segundo pode atacar, no terceiro recarrega, e assim por diante. O ciclo avança mesmo sem disparar e considera somente os turnos daquela unidade. Movimento e habilidades continuam disponíveis durante a recarga. O contador `turnCount` é preservado em reconexões. No laboratório, **Próximo turno do token** avança esse ciclo e recupera a estamina; restaurar recursos ou trocar de arma não reinicia o contador. Nos turnos disponíveis, o laboratório mantém seus ataques repetidos para testes.
 
 O combate multiplayer e o laboratório compartilham a aplicação dos efeitos em `backend/internal/realtime/game/weapon_effects.go`. As prévias do frontend consultam os mesmos IDs de efeito; os efeitos negativos também aparecem no painel do laboratório. Adicionar um efeito existente a outra arma permite reutilizar o comportamento sem verificar o ID da arma.
 
 ## Recursos e catálogo de habilidades
 
-As constantes em `backend/models/unit_rules.go` definem as unidades iniciais: 3 de vida, capacidade de escudo de 3, 4 de estamina, 1 slot de item e 2 slots de habilidades. Escudo é uma habilidade passiva (`passive: true`): ao equipá-la, a unidade inicia a partida com 3 pontos de proteção. Sem a passiva, começa sem proteção. O escudo não se regenera entre turnos, rounds ou reconexões; não existe botão para ativá-lo, e o servidor rejeita tentativas de ativação manual.
+As constantes em `backend/models/unit_rules.go` definem as unidades iniciais: 3 de vida, capacidade de escudo de 3, 5 de estamina, 1 slot de item e 2 slots de habilidades. Escudo é uma habilidade passiva (`passive: true`): ao equipá-la, a unidade inicia a partida com 3 pontos de proteção. Sem a passiva, começa sem proteção. O escudo não se regenera entre turnos, rounds ou reconexões; não existe botão para ativá-lo, e o servidor rejeita tentativas de ativação manual.
 
 `backend/models/abilities.go` contém `Ability`, `AbilityOptions()` e `AbilityByID()`, seguindo o catálogo de armas. Os IDs fixos são `shield`, `barricade`, `trampoline` e `grenade`. Cada habilidade possui `effect`, política de uso, alcance, descrição e os parâmetros específicos necessários. A barricada compartilha o efeito negativo de mesmo nível com as armas. O trampolim registra separadamente o avanço de dois terrenos e a subida de um terreno de um nível superior.
 

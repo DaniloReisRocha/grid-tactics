@@ -27,7 +27,7 @@ func TestStarterUnitResourcesAndShieldLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, unit := range session.Players[id].Units {
-		if unit.CurrentShield != 0 || unit.Unit.Shield != 3 || unit.CurrentLife != 3 || unit.CurrentStamina != 4 {
+		if unit.CurrentShield != 0 || unit.Unit.Shield != 3 || unit.CurrentLife != 3 || unit.CurrentStamina != models.UnitBaseStamina {
 			t.Fatalf("unit started with automatic shield or wrong resources: %+v", unit)
 		}
 	}
