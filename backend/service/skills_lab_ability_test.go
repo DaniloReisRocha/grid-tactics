@@ -16,25 +16,16 @@ func abilityFixture(id string) models.SkillsLabAbility {
 	}}
 }
 
-func TestShieldEffectAndSingleUseAreAtomic(t *testing.T) {
+func TestPassiveShieldCannotBeActivated(t *testing.T) {
 	input := abilityFixture(models.AbilityShieldID)
 	before, _ := json.Marshal(input)
-	result, err := ResolveSkillsLabAbility(input)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if result.Tokens[0].Shield != 3 || result.Tokens[0].Life != 3 || result.Tokens[0].StaminaSpent != 4 || result.Tokens[0].AbilityUses[models.AbilityShieldID] != 1 {
-		t.Fatalf("invalid shield result: %+v", result.Tokens[0])
+	_, err := ResolveSkillsLabAbility(input)
+	if err == nil {
+		t.Fatal("passive shield accepted as an active ability")
 	}
 	after, _ := json.Marshal(input)
 	if string(before) != string(after) {
 		t.Fatal("ability mutated input state")
-	}
-	input.Tokens = result.Tokens
-	input.MatchAbilityUses = result.MatchAbilityUses
-	input.Tokens[0].Shield = 0
-	if _, err := ResolveSkillsLabAbility(input); err == nil {
-		t.Fatal("shield could be reused after breaking")
 	}
 }
 

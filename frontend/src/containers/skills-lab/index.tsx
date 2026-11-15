@@ -8,8 +8,8 @@ import { attackInLab, activateAbilityInLab, loadLab, type LabConfig, type LabLay
 import { movementOptions, positionKey } from "@/internal/game/pathfinding";
 import { labAttackProblem, labMovementUnit, labStamina, starterTokens } from "@/internal/game/skillsLab";
 import { effectiveStamina } from "@/internal/game/stamina";
-import { labAbilityProblem, abilityArea } from "@/internal/game/abilities";
-import { EffectID } from "@/internal/game/effects";
+import { labAbilityProblem, abilityArea, applyPassiveAbilities } from "@/internal/game/abilities";
+import { EffectID, weaponReloading } from "@/internal/game/effects";
 import AbilitySelector from "./AbilitySelector";
 import "./styles.css";
 
@@ -173,8 +173,8 @@ export default function SkillsLab() {
       if (!isWalkable(tile) || occupied.has(key)) { setError("Adicione o token em um terreno acessível e livre."); return; }
       if (tokens.length >= 128) { setError("Limite de 128 tokens por cenário."); return; }
       const next: SkillToken = { id: crypto.randomUUID(), x: tile.x, y: tile.y, team, model, weaponID,
-        life, maxLife: life, shield, maxShield: shield, abilityIDs: [...abilityIDs], staminaSpent: 0, path: [] };
-      setTokens((items) => [...items, next]); setSelectedID(next.id);
+        life, maxLife: life, shield, maxShield: shield, abilityIDs: [...abilityIDs], staminaSpent: 0, path: [], turnCount: 1 };
+      setTokens((items) => [...items, applyPassiveAbilities(next, abilities)]); setSelectedID(next.id);
       addLog(`Token da equipe ${team + 1} adicionado em (${tile.x}, ${tile.y}).`);
       return;
     }
@@ -207,12 +207,19 @@ export default function SkillsLab() {
     const next = [current[0] ?? "", current[1] ?? ""];
     next[slot] = id;
     if (tool === "add") setAbilityIDs(next);
-    else if (selected) setTokens((items) => items.map((token) => token.id === selected.id ? { ...token, abilityIDs: next } : token));
+    else if (selected) setTokens((items) => items.map((token) => token.id === selected.id ? applyPassiveAbilities({ ...token, abilityIDs: next }, abilities) : token));
   };
   const recoverStamina = () => {
     if (!selected) return;
     setTokens((items) => items.map((token) => token.id === selected.id ? { ...token, staminaSpent: 0 } : token));
     setError(null); addLog("Estamina recuperada até o limite da arma equipada.");
+  };
+  const nextTokenTurn = () => {
+    if (!selected || selected.life <= 0) return;
+    setTokens((items) => items.map((token) => token.id === selected.id
+      ? {...token, turnCount: Math.min(1000000, Math.max(1, token.turnCount ?? 1) + 1), staminaSpent: 0} : token));
+    setActiveAbilityID(null); setTool("select"); setHovered(null); setError(null);
+    addLog("Próximo turno do token: estamina recuperada e ciclo de recarga avançado.");
   };
   const restoreSelected = () => {
     if (!selected) return;
@@ -296,6 +303,8 @@ export default function SkillsLab() {
               <span>Token {index + 1} · E{token.team + 1}<small>{token.life <= 0 ? "☠ Derrotado" : `Vida ${token.life}/${token.maxLife} · Escudo ${token.shield}/${token.maxShield}`} · ({token.x}, {token.y})</small><small>Estamina {labStamina(token, weapons, baseStamina).current}/{labStamina(token, weapons, baseStamina).max}</small></span>
             </button>)}</div>
             {selected ? <>
+              <p>Turno do token: {Math.max(1, selected.turnCount ?? 1)} · {weaponReloading(selectedWeapon, selected.turnCount) ? "Recarregando" : "Pronto para atacar"}</p>
+              <button className="lab-restore" disabled={pending || selected.life <= 0} onClick={nextTokenTurn}>Próximo turno do token</button>
               <button className="lab-restore" disabled={pending || selected.life <= 0 || selectedStamina?.current === selectedStamina?.max} onClick={recoverStamina}>Recuperar estamina</button>
               <button className="lab-restore" disabled={pending} onClick={restoreSelected}>Restaurar recursos do selecionado</button>
             </> : null}

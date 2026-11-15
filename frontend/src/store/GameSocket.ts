@@ -5,6 +5,7 @@ import { GameSocket, MessageType, type ConnectionStatus } from "@/api/webSocket/
 import { canUnitAttack, isAttackTarget, isBarricadeTarget } from "@/internal/game/combat";
 
 const emptyGame: GameStatePayload = {
+  currentUnitID: "", roundCounter: 0, roundTurn: 0, roundOrder: [],
   id: "", players: {}, board: [], turnOrder: [], currentTurn: null,
   turnCounter: 0, status: "waiting", winner: null, revision: -1,
   matchAbilityUses: {},
@@ -29,6 +30,7 @@ export const gameStore = create<GameStore>((set, get) => {
   const act = (type: string, payload: unknown = {}) => {
     const state = get();
     if (state.pending || state.status !== "playing" || state.currentTurn !== state.accountID) return;
+    if (type !== MessageType.endTurn && (payload as { unitID?: string }).unitID !== state.currentUnitID) return;
     if (!GameSocket.sendAction(type, payload)) { set({ error: "Aguarde a conexão com o servidor." }); return; }
     set({ pending: true, error: null });
   };
@@ -78,8 +80,9 @@ GameSocket.subscribe((message) => {
       ...payload, pending: false, error: null,
       skillMode: null,
       board: JSON.stringify(payload.board) === JSON.stringify(state.board) ? state.board : payload.board,
-      unitID: selected ? state.unitID : null,
+      unitID: payload.currentUnitID !== state.currentUnitID ? payload.currentUnitID || null : selected ? state.unitID : null,
       attackMode: state.attackMode && payload.currentTurn === state.accountID && payload.status === "playing"
+        && payload.currentUnitID === state.currentUnitID && selected?.unit.id === payload.currentUnitID
         && Boolean(selected && canUnitAttack(selected)),
     });
   }

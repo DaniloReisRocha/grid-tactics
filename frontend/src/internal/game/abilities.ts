@@ -5,6 +5,7 @@ import { EffectID } from "./effects";
 
 export function combatSkillToken(unit: UnitInstance): SkillToken {
   return {id:unit.unit.id,x:unit.x,y:unit.y,team:unit.player-1,model:0,life:unit.currentLife,shield:unit.currentShield,
+    turnCount:unit.turnCount,
     maxLife:unit.unit.lp,maxShield:unit.unit.shield,weaponID:unit.unit.weapons[0]?.id??"pistol",abilityIDs:(unit.unit.abilities??[]).map((item)=>item.id),
     abilityUses:unit.abilityUses,path:unit.path??[],staminaSpent:0,movementMode:unit.movementMode};
 }
@@ -12,6 +13,7 @@ export function combatSkillToken(unit: UnitInstance): SkillToken {
 export function labAbilityProblem(actor: SkillToken | undefined, ability: Ability | undefined, board: readonly Cell[], tokens: readonly SkillToken[], matchUses: Record<string, number>, target?: Position) {
   if (!actor || actor.life <= 0) return "Selecione uma unidade viva.";
   if (!ability || !actor.abilityIDs?.includes(ability.id)) return "Equipe a habilidade na unidade.";
+  if (ability.passive) return "Passiva: aplicada automaticamente ao equipar.";
   if (ability.uses === "single" && (actor.abilityUses?.[ability.id] ?? 0) > 0) return "Esta unidade já utilizou a habilidade.";
   const matchCount = Math.max(matchUses[ability.id] ?? 0, tokens.reduce((sum,token) => sum+(token.abilityUses?.[ability.id] ?? 0),0));
   if (ability.maxUsesPerMatch > 0 && matchCount >= ability.maxUsesPerMatch) return "Limite por partida atingido.";
@@ -45,4 +47,19 @@ export function abilityArea(ability: Ability | undefined, center: Position | nul
   if (!ability || !center || !ability.effect.some((effect) => effect.id === EffectID.areaDamageOrShieldBreak)) return [];
   const radius = Math.floor(ability.areaSize/2);
   return board.filter((tile) => Math.abs(tile.x-center.x) <= radius && Math.abs(tile.y-center.y) <= radius);
+}
+
+// Lab tokens keep a one-time marker so swapping equipment cannot refill a broken shield.
+export function applyPassiveAbilities(token: SkillToken, abilities: readonly Ability[]): SkillToken {
+  if (token.life <= 0) return token;
+  let result = token;
+  for (const ability of abilities) {
+    if (!ability.passive || !token.abilityIDs.includes(ability.id) || (result.abilityUses?.[ability.id] ?? 0) > 0) continue;
+    if (ability.effect.some((effect) => effect.id === EffectID.grantShield)) {
+      const shield = Math.max(result.shield, Math.min(3, ability.shield));
+      result = {...result, shield, maxShield: Math.max(result.maxShield, shield),
+        abilityUses: {...result.abilityUses, [ability.id]: 1}};
+    }
+  }
+  return result;
 }

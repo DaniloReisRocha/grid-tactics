@@ -1,9 +1,10 @@
 package game
 
 import (
-	"errors"
 	"github.com/DaniloReisRocha/grid-tactics/backend/internal/realtime"
+	"github.com/DaniloReisRocha/grid-tactics/backend/models"
 	"github.com/gofrs/uuid"
+	"math/rand"
 )
 
 func (s *GameSession) EndTurn(id uuid.UUID) error {
@@ -12,33 +13,86 @@ func (s *GameSession) EndTurn(id uuid.UUID) error {
 	if _, err := s.actingPlayer(id); err != nil {
 		return err
 	}
-	current := 0
-	for i, playerID := range s.TurnOrder {
-		if playerID == id {
-			current = i
-			break
+	s.advanceUnitTurn()
+	s.changed()
+	return nil
+}
+
+// Shuffle and interleave once per match. Later rounds reuse the same order,
+// keeping eliminated units in their slots and skipping them when advancing.
+func (s *GameSession) startRound() {
+	if len(s.RoundOrder) > 0 {
+		s.RoundCounter++
+		s.RoundTurn = 0
+		for s.RoundTurn < len(s.RoundOrder) && s.turnUnit(s.RoundOrder[s.RoundTurn]) == nil {
+			s.RoundTurn++
 		}
+		return
 	}
-	for offset := 1; offset <= len(s.TurnOrder); offset++ {
-		next := s.TurnOrder[(current+offset)%len(s.TurnOrder)]
-		p := s.Players[next]
-		alive := false
-		for i := range p.Units {
-			if p.Units[i].CurrentLife > 0 {
-				p.Units[i].CurrentStamina = p.Units[i].Unit.EffectiveStamina()
-				p.Units[i].HasAttacked = false
-				alive = true
+	queues := make([][]models.UnitTurn, len(s.TurnOrder))
+	remaining := 0
+	for i, id := range s.TurnOrder {
+		for _, unit := range s.Players[id].Units {
+			if unit.CurrentLife > 0 {
+				queues[i] = append(queues[i], models.UnitTurn{PlayerID: id, UnitID: unit.Unit.ID})
+				remaining++
 			}
 		}
-		if !alive {
-			continue
-		}
-		s.CurrentTurn = &next
-		s.TurnCounter++
-		s.changed()
-		return nil
+		rand.Shuffle(len(queues[i]), func(a, b int) { queues[i][a], queues[i][b] = queues[i][b], queues[i][a] })
 	}
-	return errors.New("nenhum jogador ativo")
+	s.RoundOrder = []models.UnitTurn{}
+	if remaining == 0 {
+		return
+	}
+	next := rand.Intn(len(queues))
+	for remaining > 0 {
+		if len(queues[next]) > 0 {
+			s.RoundOrder = append(s.RoundOrder, queues[next][0])
+			queues[next] = queues[next][1:]
+			remaining--
+		}
+		next = (next + 1) % len(queues)
+	}
+	s.RoundCounter++
+	s.RoundTurn = 0
+}
+
+func (s *GameSession) turnUnit(turn models.UnitTurn) *models.UnitInstance {
+	if p := s.Players[turn.PlayerID]; p != nil {
+		for i := range p.Units {
+			if p.Units[i].Unit.ID == turn.UnitID && p.Units[i].CurrentLife > 0 {
+				return &p.Units[i]
+			}
+		}
+	}
+	return nil
+}
+
+func (s *GameSession) beginUnitTurn() {
+	turn := s.RoundOrder[s.RoundTurn]
+	unit := s.turnUnit(turn)
+	s.CurrentTurn = &turn.PlayerID
+	s.CurrentUnitID = turn.UnitID
+	s.TurnCounter++
+	unit.CurrentStamina = unit.Unit.EffectiveStamina()
+	unit.HasAttacked = false
+	unit.TurnCount++
+}
+
+func (s *GameSession) advanceUnitTurn() {
+	s.RoundTurn++
+	for s.RoundTurn < len(s.RoundOrder) && s.turnUnit(s.RoundOrder[s.RoundTurn]) == nil {
+		s.RoundTurn++
+	}
+	if s.RoundTurn >= len(s.RoundOrder) {
+		s.startRound()
+	}
+	if s.RoundTurn >= len(s.RoundOrder) {
+		s.CurrentTurn = nil
+		s.CurrentUnitID = ""
+		return
+	}
+	s.beginUnitTurn()
 }
 
 // Disconnect pauses a started match, allowing the same account to reconnect.
@@ -71,6 +125,7 @@ func (s *GameSession) Disconnect(conn *realtime.WSConnection, leave bool) {
 				}
 				s.Status = "finished"
 				s.CurrentTurn = nil
+				s.CurrentUnitID = ""
 			}
 		}
 		s.changed()

@@ -2,7 +2,7 @@ import { useGameSocket } from "@/store/GameSocket";
 import { canUnitAttack } from "@/internal/game/combat";
 import { effectiveStamina } from "@/internal/game/stamina";
 import { combatSkillToken,labAbilityProblem } from "@/internal/game/abilities";
-import { EffectID } from "@/internal/game/effects";
+import { EffectID, weaponReloading } from "@/internal/game/effects";
 import "@/styles/game/PieceInfoPanel.css";
 
 export const PieceInfoPanel = () => {
@@ -14,6 +14,7 @@ export const PieceInfoPanel = () => {
     attackMode,
     setAttackMode,
     currentTurn,
+    currentUnitID,
     status,
     pending,
     connection,
@@ -23,11 +24,13 @@ export const PieceInfoPanel = () => {
   const selected = units.find((unit) => unit.unit.id === unitID);
   const canAct =
     selected?.ownerID === accountID &&
+    selected?.unit.id === currentUnitID && selected.currentLife > 0 &&
     currentTurn === accountID &&
     status === "playing" &&
     !pending &&
     connection === "connected";
   const weapon = selected?.unit.weapons[0];
+  const reloading = weaponReloading(weapon, selected?.turnCount);
   const tokens=units.map(combatSkillToken);
 
   return (
@@ -46,8 +49,9 @@ export const PieceInfoPanel = () => {
             Stamina: {selected.currentStamina}/{effectiveStamina(selected.unit.stamina, selected.unit.weapons)}
           </div>
           <div>
-            Ataques disponíveis neste turno: {selected.hasAttacked ? 0 : 1}
+            Ataques disponíveis neste turno: {canUnitAttack(selected) ? 1 : 0}
           </div>
+          {reloading ? <div role="status">Recarregando · Ataque disponível no próximo turno desta unidade.</div> : null}
           {weapon ? (
             <div>
               {weapon.icon} {weapon.name} · Alcance {weapon.range} · Dano{" "}
@@ -60,7 +64,7 @@ export const PieceInfoPanel = () => {
             disabled={!canAct || !canUnitAttack(selected)}
             onClick={() => setAttackMode(!attackMode)}
           >
-            {selected.hasAttacked
+            {reloading ? "Recarregando" : selected.hasAttacked
               ? "Ataque utilizado"
               : attackMode
                 ? "Cancelar ataque"
@@ -68,6 +72,7 @@ export const PieceInfoPanel = () => {
           </button>
           <div style={{display:"grid",gap:8,marginTop:12,fontSize:13}}>
             {(selected.unit.abilities??[]).map((ability)=>{
+              if (ability.passive) return <div key={ability.id} title={ability.description}>{ability.icon} {ability.name} · Passiva</div>;
               const problem=labAbilityProblem(combatSkillToken(selected),ability,board,tokens,matchAbilityUses??{});
               return <div key={ability.id}>
                 <button type="button" disabled={!canAct||!!problem} title={problem??ability.description} aria-pressed={skillMode===ability.id}
@@ -100,6 +105,7 @@ export const PieceInfoPanel = () => {
             >
               {unit.currentLife > 0 ? unit.unit.icon : "☠️"} · Vida{" "}
               {unit.currentLife} · Stamina {unit.currentStamina}
+              {unit.unit.id === currentUnitID ? " · Em turno" : ""}
             </button>
           ))}
         </section>

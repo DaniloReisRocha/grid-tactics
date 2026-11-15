@@ -1,6 +1,7 @@
 package models
 
 const (
+	EffectReloadID                  = "reloadTurn"
 	EffectKnockbackID               = "knockback"
 	EffectShieldBreakID             = "shieldBreak"
 	EffectNoAdjacentID              = "noAdjacentTargets"
@@ -22,6 +23,7 @@ type Effect struct {
 
 func EffectOptions() []Effect {
 	return []Effect{
+		{ID: EffectReloadID, Name: "Turno de recarga", Description: "Alterna um turno de recarga, sem ataques, com um turno disponível para atacar. O primeiro turno da unidade é de recarga.", Negative: true},
 		{ID: EffectKnockbackID, Name: "Empurrão", Description: "Empurra o alvo vivo um bloco para trás, sem sair do mapa, subir ou ocupar um slot bloqueado."},
 		{ID: EffectShieldBreakID, Name: "Quebra de escudo", Description: "Quebra todo o escudo restante do alvo após aplicar o dano do golpe."},
 		{ID: EffectNoAdjacentID, Name: "Sem ataques adjacentes", Description: "Não pode atacar unidades adjacentes.", Negative: true},

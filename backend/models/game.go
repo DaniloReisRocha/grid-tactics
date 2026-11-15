@@ -29,6 +29,7 @@ type Position struct {
 }
 
 type UnitInstance struct {
+	TurnCount int `json:"turnCount"`
 	Position
 	Player         int            `json:"player"`
 	OwnerID        uuid.UUID      `json:"ownerID"`
@@ -49,7 +50,16 @@ type Player struct {
 	Units     []UnitInstance `json:"units"`
 }
 
+type UnitTurn struct {
+	PlayerID uuid.UUID `json:"playerID"`
+	UnitID   string    `json:"unitID"`
+}
+
 type GameStatePayload struct {
+	RoundOrder       []UnitTurn            `json:"roundOrder"`
+	RoundCounter     int                   `json:"roundCounter"`
+	RoundTurn        int                   `json:"roundTurn"`
+	CurrentUnitID    string                `json:"currentUnitID"`
 	ID               string                `json:"id"`
 	Players          map[uuid.UUID]*Player `json:"players"`
 	Board            []Cell                `json:"board"`

@@ -8,10 +8,11 @@ const icons = ["🦸‍♂️", "🦸‍♀️", "🧙‍♂️"];
 export default function TeamUnitCard({ index, value, options, onChange }: Props) {
   const weapon = options.weapons.find((item) => item.id === value.weaponID);
   const slots = abilitySlotCount(weapon?.toolPenalty ?? 0, options.abilitySlots);
+  const startingShield = Math.min(options.shieldCapacity, Math.max(0, ...options.abilities.filter((ability) => value.abilityIDs.includes(ability.id) && ability.passive).map((ability) => ability.shield)));
   return <article className="team-unit" aria-label={`Equipamentos da unidade ${index + 1}`}>
     <header><span className="team-unit-avatar" aria-hidden="true">{icons[index]}</span><div><small>POSIÇÃO {index + 1}</small><h3>Unidade {index + 1}</h3></div></header>
     <dl className="team-resources">
-      <div><dt>Vida</dt><dd>{options.baseLife}</dd></div><div><dt>Escudo</dt><dd>0/{options.shieldCapacity}</dd></div>
+      <div><dt>Vida</dt><dd>{options.baseLife}</dd></div><div><dt>Escudo</dt><dd>{startingShield}/{options.shieldCapacity}</dd></div>
       <div><dt>Estamina</dt><dd>{effectiveStamina(options.baseStamina, weapon ? [weapon] : [])}/{options.baseStamina}</dd></div>
     </dl>
     <label htmlFor={`unit-${index}-weapon`}>Arma · {options.itemSlots} slot de item</label>

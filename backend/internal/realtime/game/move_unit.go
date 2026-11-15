@@ -10,7 +10,7 @@ import (
 func (s *GameSession) MovePiece(id uuid.UUID, unitID string, to models.Position) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	p, err := s.actingPlayer(id)
+	p, err := s.actingUnit(id, unitID)
 	if err != nil {
 		return err
 	}

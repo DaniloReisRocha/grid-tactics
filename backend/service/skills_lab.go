@@ -80,6 +80,9 @@ func ResolveSkillsLabAttack(input models.SkillsLabAttack) (models.SkillsLabResul
 		targetPosition = *input.Target
 	}
 	weapon, _ := models.WeaponByID(attacker.WeaponID)
+	if weapon.Reloading(attacker.TurnCount) {
+		return result, errors.New("arma em recarga neste turno; avance o turno do token para atacar")
+	}
 	dx, dy := targetPosition.X-attacker.X, targetPosition.Y-attacker.Y
 	abs := func(value int) int {
 		if value < 0 {

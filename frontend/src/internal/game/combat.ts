@@ -1,10 +1,12 @@
 import type { Cell, UnitInstance } from "@/api/models";
 import { directAttackProblem } from "./attackLine";
+import { weaponReloading } from "./effects";
 
 /** Attack allowance is independent of stamina; weapon penalties reduce movement capacity only. */
 export function canUnitAttack(unit: UnitInstance) {
   return (
     unit.currentLife > 0 && !unit.hasAttacked && unit.unit.weapons.length > 0
+    && !weaponReloading(unit.unit.weapons[0], unit.turnCount)
   );
 }
 

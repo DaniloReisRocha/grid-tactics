@@ -9,7 +9,7 @@ import (
 func (s *GameSession) Attack(id uuid.UUID, unitID string, target models.Position) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	p, err := s.actingPlayer(id)
+	p, err := s.actingUnit(id, unitID)
 	if err != nil {
 		return err
 	}
@@ -30,6 +30,9 @@ func (s *GameSession) Attack(id uuid.UUID, unitID string, target models.Position
 		return errors.New("unidade sem arma")
 	}
 	weapon := attacker.Unit.Weapons[0]
+	if weapon.Reloading(attacker.TurnCount) {
+		return errors.New("arma em recarga neste turno; a unidade não pode atacar")
+	}
 	dx, dy := abs(attacker.X-target.X), abs(attacker.Y-target.Y)
 	if dx != 0 && dy != 0 {
 		return errors.New("o alvo precisa estar na mesma linha ou coluna do atacante")
@@ -93,6 +96,7 @@ func (s *GameSession) Attack(id uuid.UUID, unitID string, target models.Position
 				s.Winner = &winner
 				s.Status = "finished"
 				s.CurrentTurn = nil
+				s.CurrentUnitID = ""
 			}
 			s.changed()
 			return nil

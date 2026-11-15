@@ -75,8 +75,8 @@ func TestSkillsLabAbilityEndpointPreservesUsage(t *testing.T) {
 	h := SkillsLabHandler{}
 	method, path, handler := h.Ability().NewEndpoint()
 	router.Handle(method, path, handler)
-	input := models.SkillsLabAbility{ActorID: "a", AbilityID: models.AbilityShieldID, Target: models.Position{X: 1, Y: 1}, Board: []models.Cell{{X: 1, Y: 1, Terrain: models.TerrainGrass}}, Tokens: []models.SkillToken{
-		{ID: "a", Position: models.Position{X: 1, Y: 1}, Life: 3, MaxShield: 3, WeaponID: models.WeaponPistolID, AbilityIDs: []string{models.AbilityShieldID}, StaminaSpent: 4},
+	input := models.SkillsLabAbility{ActorID: "a", AbilityID: models.AbilityBarricadeID, Target: models.Position{X: 2, Y: 1}, Board: []models.Cell{{X: 1, Y: 1, Terrain: models.TerrainGrass}, {X: 2, Y: 1, Terrain: models.TerrainGrass}}, Tokens: []models.SkillToken{
+		{ID: "a", Position: models.Position{X: 1, Y: 1}, Life: 3, MaxShield: 3, WeaponID: models.WeaponPistolID, AbilityIDs: []string{models.AbilityBarricadeID}, StaminaSpent: 4},
 	}}
 	for attempt := 0; attempt < 2; attempt++ {
 		body, _ := json.Marshal(input)
@@ -91,7 +91,7 @@ func TestSkillsLabAbilityEndpointPreservesUsage(t *testing.T) {
 			break
 		}
 		var result models.SkillsLabAbilityResult
-		if response.Code != http.StatusOK || json.Unmarshal(response.Body.Bytes(), &result) != nil || len(result.Tokens) != 1 || result.Tokens[0].Shield != 3 || result.Tokens[0].StaminaSpent != 4 {
+		if response.Code != http.StatusOK || json.Unmarshal(response.Body.Bytes(), &result) != nil || len(result.Tokens) != 1 || result.Tokens[0].AbilityUses[models.AbilityBarricadeID] != 1 || result.Tokens[0].StaminaSpent != 4 {
 			t.Fatalf("ability request failed: %s", response.Body.String())
 		}
 		input.Board, input.Tokens, input.MatchAbilityUses = result.Board, result.Tokens, result.MatchAbilityUses

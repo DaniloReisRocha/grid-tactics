@@ -20,6 +20,9 @@ func validateLabScene(board []models.Cell, tokens []models.SkillToken) (map[mode
 	}
 	ids, occupied := map[string]bool{}, map[models.Position]bool{}
 	for _, token := range tokens {
+		if token.TurnCount < 0 || token.TurnCount > 1000000 {
+			return nil, errors.New("contador de turnos inválido")
+		}
 		_, onBoard := cells[token.Position]
 		_, validWeapon := models.WeaponByID(token.WeaponID)
 		if token.ID == "" || ids[token.ID] || !onBoard || !validWeapon || token.Team < 0 || token.Team > 1 || token.Model < 0 || token.Model > 2 || token.Life < 0 || token.Life > 99 || token.Shield < 0 || token.Shield > 99 {

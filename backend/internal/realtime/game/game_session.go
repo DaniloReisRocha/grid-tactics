@@ -21,6 +21,10 @@ type PlayerState struct {
 }
 
 type GameSession struct {
+	RoundOrder       []models.UnitTurn
+	RoundCounter     int
+	RoundTurn        int
+	CurrentUnitID    string
 	ID               string
 	maximumPlayers   int
 	spawnSlots       []models.Position
@@ -82,6 +86,8 @@ func (s *GameSession) BroadcastState() error {
 		winner = &id
 	}
 	payload := models.GameStatePayload{
+		RoundOrder: append([]models.UnitTurn{}, s.RoundOrder...), RoundCounter: s.RoundCounter,
+		RoundTurn: s.RoundTurn, CurrentUnitID: s.CurrentUnitID,
 		ID: s.ID, Players: players, Board: append([]models.Cell{}, s.Board...),
 		TurnOrder: append([]uuid.UUID{}, s.TurnOrder...), CurrentTurn: turn,
 		TurnCounter: s.TurnCounter, Status: s.Status, Winner: winner, Revision: s.Revision,
@@ -136,8 +142,7 @@ func (s *GameSession) AddPlayer(conn *realtime.WSConnection, id uuid.UUID, units
 			occupied[position] = true
 			roster = append(roster, models.UnitInstance{
 				Position: position, Player: len(s.TurnOrder) + 1, OwnerID: id, Unit: unit,
-				// Shield is a capacity; only abilities grant an active shield.
-				CurrentLife: unit.LP, CurrentShield: 0, CurrentStamina: unit.EffectiveStamina(),
+				CurrentLife: unit.LP, CurrentShield: unit.InitialShield(), CurrentStamina: unit.EffectiveStamina(),
 			})
 			found = true
 			break
@@ -158,10 +163,9 @@ func (s *GameSession) AddPlayer(conn *realtime.WSConnection, id uuid.UUID, units
 		}
 	}
 	if len(s.Players) == s.maximumPlayers {
-		first := s.TurnOrder[0]
-		s.CurrentTurn = &first
-		s.TurnCounter = 1
 		s.Status = "playing"
+		s.startRound()
+		s.beginUnitTurn()
 	}
 	s.changed()
 	return nil
@@ -201,6 +205,17 @@ func (s *GameSession) actingPlayer(id uuid.UUID) (*PlayerState, error) {
 	p, ok := s.Players[id]
 	if !ok || !p.Connected {
 		return nil, errors.New("jogador indisponível")
+	}
+	return p, nil
+}
+
+func (s *GameSession) actingUnit(id uuid.UUID, unitID string) (*PlayerState, error) {
+	p, err := s.actingPlayer(id)
+	if err != nil {
+		return nil, err
+	}
+	if unitID != s.CurrentUnitID {
+		return nil, errors.New("não é o turno desta unidade")
 	}
 	return p, nil
 }

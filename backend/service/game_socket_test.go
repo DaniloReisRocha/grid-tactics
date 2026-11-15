@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -75,10 +76,20 @@ func TestTwoClientsMoveTurnReconnectReplaceAndLeave(t *testing.T) {
 	join(two, b)
 	state := readState(t, one, "playing")
 	readState(t, two, "playing")
-	if state.CurrentTurn == nil || *state.CurrentTurn != a {
-		t.Fatal("wrong initial turn")
+	if state.CurrentTurn == nil || state.CurrentUnitID == "" || state.RoundCounter != 1 || len(state.RoundOrder) != 6 {
+		t.Fatal("missing initial round")
 	}
-	unit := state.Players[a].Units[0]
+	if *state.CurrentTurn == b {
+		a, b = b, a
+		one, two = two, one
+	}
+	var unit models.UnitInstance
+	for _, candidate := range state.Players[a].Units {
+		if candidate.Unit.ID == state.CurrentUnitID {
+			unit = candidate
+			break
+		}
+	}
 	used := map[models.Position]bool{}
 	for _, p := range state.Players {
 		for _, u := range p.Units {
@@ -91,7 +102,7 @@ func TestTwoClientsMoveTurnReconnectReplaceAndLeave(t *testing.T) {
 	for _, cell := range state.Board {
 		cells[models.Position{X: cell.X, Y: cell.Y}] = cell
 	}
-	for _, candidate := range state.Players[a].Units {
+	for _, candidate := range []models.UnitInstance{unit} {
 		unit = candidate
 		for _, delta := range []models.Position{{X: 1}, {X: -1}, {Y: 1}, {Y: -1}} {
 			next := models.Position{X: unit.X + delta.X, Y: unit.Y + delta.Y}
@@ -130,6 +141,8 @@ func TestTwoClientsMoveTurnReconnectReplaceAndLeave(t *testing.T) {
 	if *state.CurrentTurn != b || state.TurnCounter != 2 {
 		t.Fatal("turn not synchronized")
 	}
+	roundOrder := append([]models.UnitTurn{}, state.RoundOrder...)
+	roundTurn, roundCounter, activeUnit := state.RoundTurn, state.RoundCounter, state.CurrentUnitID
 	sendAction(t, one, movePiece, movePieceAction{UnitID: unit.Unit.ID, To: unit.Position})
 	_ = one.SetReadDeadline(time.Now().Add(3 * time.Second))
 	var failure struct {
@@ -151,6 +164,9 @@ func TestTwoClientsMoveTurnReconnectReplaceAndLeave(t *testing.T) {
 	readState(t, two, "playing")
 	if state.TurnCounter != 2 || findUnit(state).Position != target {
 		t.Fatal("reconnect reset match")
+	}
+	if !reflect.DeepEqual(roundOrder, state.RoundOrder) || state.RoundTurn != roundTurn || state.RoundCounter != roundCounter || state.CurrentUnitID != activeUnit {
+		t.Fatal("reconnect reshuffled or advanced the round")
 	}
 	replacement := dial()
 	defer replacement.Close()
@@ -187,7 +203,7 @@ func TestSocketRejectsUnlistedOrigin(t *testing.T) {
 	}
 }
 
-func TestSelectedTeamAndSkillPersistOnWebSocketReconnect(t *testing.T) {
+func TestSelectedTeamAndPassivePersistOnWebSocketReconnect(t *testing.T) {
 	roster := &GameUnitsGetService{}
 	svc := GameWsService{Sessions: game.NewSessionManager(), GetUnits: roster.Run}
 	server := httptest.NewServer(http.HandlerFunc(svc.Receive))
@@ -216,11 +232,27 @@ func TestSelectedTeamAndSkillPersistOnWebSocketReconnect(t *testing.T) {
 		}
 	}
 	unit := state.Players[a].Units[0]
+	for tries := 0; state.CurrentUnitID != unit.Unit.ID && tries < 6; tries++ {
+		conn := one
+		if *state.CurrentTurn == b {
+			conn = two
+		}
+		sendAction(t, conn, endTurn, struct{}{})
+		state = readState(t, one, "playing")
+		readState(t, two, "playing")
+	}
+	if state.CurrentUnitID != unit.Unit.ID {
+		t.Fatal("equipped unit never received its turn")
+	}
 	sendAction(t, one, useAbility, useAbilityAction{UnitID: unit.Unit.ID, AbilityID: models.AbilityShieldID, To: unit.Position})
-	state = readState(t, one, "playing")
-	readState(t, two, "playing")
+	var failure struct {
+		Type string `json:"type"`
+	}
+	if err := one.ReadJSON(&failure); err != nil || failure.Type != actionFailed {
+		t.Fatal("passive accepted as active skill", err)
+	}
 	if state.Players[a].Units[0].CurrentShield != 3 {
-		t.Fatal("equipped skill did not execute over websocket")
+		t.Fatal("equipped passive was not applied at spawn")
 	}
 	one.Close()
 	readState(t, two, "paused")
@@ -232,7 +264,7 @@ func TestSelectedTeamAndSkillPersistOnWebSocketReconnect(t *testing.T) {
 	state = readState(t, reconnected, "playing")
 	readState(t, two, "playing")
 	unit = state.Players[a].Units[0]
-	if unit.Unit.Weapons[0].ID != models.WeaponPistolID || unit.CurrentShield != 3 || unit.AbilityUses[models.AbilityShieldID] != 1 {
+	if unit.Unit.Weapons[0].ID != models.WeaponPistolID || unit.CurrentShield != 3 || unit.AbilityUses[models.AbilityShieldID] != 0 {
 		t.Fatal("reconnection changed loadout or restored consumed skill")
 	}
 }

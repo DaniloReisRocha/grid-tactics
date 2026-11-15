@@ -3,6 +3,7 @@ import type { CharacterModel } from "@/components/ProceduralMap/types";
 import { backendURL, backendHeaders } from "./backendURL";
 
 export interface SkillToken extends Position {
+  turnCount?: number;
   id: string;
   team: number;
   model: CharacterModel;

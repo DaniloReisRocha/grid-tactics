@@ -22,6 +22,9 @@ func ResolveAbilityEffects(input models.SkillsLabAbility) (models.SkillsLabAbili
 	if !exists || actorIndex < 0 {
 		return result, errors.New("habilidade ou unidade inválida")
 	}
+	if ability.Passive {
+		return result, errors.New("habilidades passivas são aplicadas automaticamente e não podem ser ativadas")
+	}
 	actor := input.Tokens[actorIndex]
 	if actor.Life <= 0 || !slices.Contains(actor.AbilityIDs, ability.ID) {
 		return result, errors.New("a unidade precisa estar viva e ter a habilidade equipada")

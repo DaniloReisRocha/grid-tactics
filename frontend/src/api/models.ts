@@ -15,6 +15,7 @@ export type Weapon = {
   effect: Effect[];
 };
 export type Ability = {
+  passive: boolean;
   id: string; name: string; icon: string;
   uses: "single" | "unlimited";
   range: number; damage: number; shield: number; areaSize: number;
@@ -28,6 +29,7 @@ export type Unit = {
   itemSlots: number; abilitySlots: number; abilities: Ability[];
 };
 export type UnitInstance = Position & {
+  turnCount: number;
   player: number; ownerID: string;
   path?: Position[];
   currentStamina: number; currentShield: number; currentLife: number; unit: Unit;
@@ -38,6 +40,8 @@ export type UnitInstance = Position & {
 export type Player = { name: string; accoID: string; connected: boolean; units: UnitInstance[] };
 export type GameStatus = "waiting" | "playing" | "paused" | "finished";
 export type GameStatePayload = {
+  currentUnitID: string; roundCounter: number; roundTurn: number;
+  roundOrder: { playerID: string; unitID: string }[];
   id: string; players: Record<string, Player>; board: Cell[];
   turnOrder: string[]; currentTurn: string | null; turnCounter: number;
   status: GameStatus; winner: string | null; revision: number;

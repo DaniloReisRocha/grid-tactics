@@ -7,23 +7,24 @@ import (
 
 func TestMultiplayerSkillOwnershipTurnAndConsumption(t *testing.T) {
 	s, a, b := startedSession(t)
-	shield, _ := models.AbilityByID(models.AbilityShieldID)
+	ability, _ := models.AbilityByID(models.AbilityBarricadeID)
 	unit := &s.Players[a].Units[0]
 	unit.Position = models.Position{X: 1, Y: 1}
 	s.Players[b].Units[0].Position = models.Position{X: 2, Y: 1}
-	unit.Unit.Abilities = []models.Ability{shield}
+	unit.Unit.Abilities = []models.Ability{ability}
+	target := models.Position{X: 1, Y: 2}
 	unit.CurrentStamina = 0
-	if err := s.UseAbility(b, "a", shield.ID, unit.Position); err == nil {
+	if err := s.UseAbility(b, "a", ability.ID, target); err == nil {
 		t.Fatal("opponent used an ability out of turn")
 	}
-	if err := s.UseAbility(a, "b", shield.ID, s.Players[b].Units[0].Position); err == nil {
+	if err := s.UseAbility(a, "b", ability.ID, target); err == nil {
 		t.Fatal("used another player's unit")
 	}
-	if err := s.UseAbility(a, "a", shield.ID, unit.Position); err != nil {
+	if err := s.UseAbility(a, "a", ability.ID, target); err != nil {
 		t.Fatal(err)
 	}
-	if unit.CurrentShield != 3 || unit.CurrentStamina != 0 || unit.HasAttacked || unit.AbilityUses[shield.ID] != 1 {
-		t.Fatal("ability charged attack/stamina or did not apply shield")
+	if unit.CurrentShield != 0 || unit.CurrentStamina != 0 || unit.HasAttacked || unit.AbilityUses[ability.ID] != 1 {
+		t.Fatal("ability charged attack/stamina or did not record usage")
 	}
 	if err := s.EndTurn(a); err != nil {
 		t.Fatal(err)
@@ -32,7 +33,7 @@ func TestMultiplayerSkillOwnershipTurnAndConsumption(t *testing.T) {
 		t.Fatal(err)
 	}
 	unit.CurrentShield = 0
-	if err := s.UseAbility(a, "a", shield.ID, unit.Position); err == nil {
+	if err := s.UseAbility(a, "a", ability.ID, target); err == nil {
 		t.Fatal("turn renewed a consumed single-use skill")
 	}
 }

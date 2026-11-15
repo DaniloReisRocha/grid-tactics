@@ -10,7 +10,7 @@ import (
 func (s *GameSession) UseAbility(id uuid.UUID, unitID, abilityID string, target models.Position) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	p, err := s.actingPlayer(id)
+	p, err := s.actingUnit(id, unitID)
 	if err != nil {
 		return err
 	}
@@ -70,12 +70,16 @@ func (s *GameSession) UseAbility(id uuid.UUID, unitID, abilityID string, target 
 	if len(aliveTeams) < 2 {
 		s.Status = "finished"
 		s.CurrentTurn = nil
+		s.CurrentUnitID = ""
 		if len(aliveTeams) == 1 {
 			winner := aliveTeams[0]
 			s.Winner = &winner
 		} else {
 			s.Winner = nil
 		}
+	}
+	if s.Status == "playing" && actor.CurrentLife <= 0 {
+		s.advanceUnitTurn()
 	}
 	s.changed()
 	return nil

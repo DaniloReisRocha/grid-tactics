@@ -8,6 +8,17 @@ const (
 	UnitAbilitySlots   = 2
 )
 
+// InitialShield is applied once at spawn, never on turns or reconnections.
+func (unit Unit) InitialShield() int {
+	shield := 0
+	for _, ability := range unit.Abilities {
+		if ability.Passive && ability.HasEffect(EffectGrantShieldID) {
+			shield = max(shield, ability.Shield)
+		}
+	}
+	return min(shield, unit.Shield, UnitShieldCapacity)
+}
+
 // Penalties reduce the movement budget, rather than charge an attack cost.
 func (unit Unit) EffectiveStamina() int {
 	penalty := 0

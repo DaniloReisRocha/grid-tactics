@@ -114,16 +114,32 @@ test("weapon stamina penalties limit lab paths and preserve expenditure across e
   assert.equal(labStamina({...token,weaponID:"sniper",staminaSpent:0},weapons).current,2);
 });
 
+test("passive shields apply on lab equipment once and cannot refill after damage", () => {
+  const {applyPassiveAbilities,labAbilityProblem} = compile("internal/game/abilities.ts");
+  const ability = {id:"shield",passive:true,shield:3,effect:[{id:"grantShield"}]};
+  const token = {id:"a",life:3,shield:0,maxShield:0,abilityIDs:["shield"],staminaSpent:3};
+  const applied = applyPassiveAbilities(token,[ability]);
+  assert.equal(applied.shield,3);
+  assert.equal(applied.maxShield,3);
+  assert.equal(applied.staminaSpent,3);
+  assert.equal(token.shield,0);
+  assert.ok(labAbilityProblem(applied,ability,[],[applied],{}));
+  const damaged = {...applied,shield:0};
+  const unequipped = applyPassiveAbilities({...damaged,abilityIDs:[]},[ability]);
+  assert.equal(applyPassiveAbilities({...unequipped,abilityIDs:["shield"]},[ability]).shield,0);
+  assert.equal(applyPassiveAbilities({...token,life:0},[ability]).shield,0);
+});
+
 test("ability previews enforce usage, cardinal targets, height, and the grenade area", () => {
   const {labAbilityProblem,abilityArea} = compile("internal/game/abilities.ts");
   const board = Array.from({length:225},(_,i)=>({x:i%15,y:Math.floor(i/15),terrain:"grass",height:0}));
   const base = {uses:"single",range:0,maxUsesPerMatch:0,maxActivePerMatch:0,effect:[]};
-  const shield = {...base,id:"shield",shield:3,effect:[{id:"grantShield"}]};
+  const shield = {...base,id:"shield",passive:true,shield:3,effect:[{id:"grantShield"}]};
   const barricade = {...base,id:"barricade",range:1,maxActivePerMatch:3,effect:[{id:"createBarricade"},{id:"sameLevelOnly"}]};
   const jump = {...base,id:"trampoline",range:2,movement:{forwardDistance:2,climbDistance:1,climbLevels:1},effect:[{id:"leap"}]};
   const grenade = {...base,id:"grenade",uses:"unlimited",range:2,areaSize:3,maxUsesPerMatch:1,effect:[{id:"areaDamageOrShieldBreak"}]};
   const actor = {id:"a",x:5,y:5,life:3,shield:0,staminaSpent:4,abilityIDs:["shield","barricade"]};
-  assert.equal(labAbilityProblem(actor,shield,board,[actor],{},actor),null);
+  assert.ok(labAbilityProblem(actor,shield,board,[actor],{},actor));
   assert.ok(labAbilityProblem({...actor,shield:3},shield,board,[actor],{},actor));
   assert.ok(labAbilityProblem({...actor,abilityUses:{shield:1}},shield,board,[actor],{},actor));
   assert.equal(labAbilityProblem(actor,barricade,board,[actor],{},{x:6,y:5}),null);
@@ -274,6 +290,26 @@ test("stamina charges uphill differences only, caps the bonus at 2 and previews 
   assert.equal(movementOptions(board,elevated,[elevated]).costs.get("5,0"),2);
 });
 
+test("reload effect blocks targets on first and odd own turns while remaining reusable", () => {
+  const {weaponReloading} = compile("internal/game/effects.ts");
+  const {canUnitAttack,isAttackTarget,isBarricadeTarget} = compile("internal/game/combat.ts");
+  const {labAttackProblem} = compile("internal/game/skillsLab.ts");
+  const weapon = {id:"custom",range:5,effect:[{id:"reloadTurn"}]};
+  const board = [0,1,2,3].map(x=>({x,y:0,terrain:"grass",height:0}));
+  const target = {x:3,y:0,ownerID:"b",currentLife:3};
+  for (const turnCount of [0,1,2,3,4,5,6]) {
+    const reloading = turnCount<=0 || turnCount%2===1;
+    const attacker = {x:0,y:0,ownerID:"a",currentLife:3,hasAttacked:false,currentStamina:0,turnCount,unit:{weapons:[weapon]}};
+    assert.equal(weaponReloading(weapon,turnCount),reloading);
+    assert.equal(canUnitAttack(attacker),!reloading);
+    assert.equal(isAttackTarget(attacker,target,board),!reloading);
+    assert.equal(isBarricadeTarget(attacker,{...board[2],object:"barricade"},board),!reloading);
+    const token = {x:0,y:0,life:3,team:0,weaponID:weapon.id,turnCount};
+    assert.equal(Boolean(labAttackProblem(token,{...target,life:3,team:1},board,[weapon])),reloading);
+  }
+  assert.equal(weaponReloading({...weapon,effect:[]},1),false);
+});
+
 test("attack availability and targets ignore stamina and staminaPenalty, but enforce one attack per unit", () => {
   const { canUnitAttack, isAttackTarget } = compile("internal/game/combat.ts");
   const attacker = {
@@ -314,7 +350,7 @@ test("empty slots do not send attacks, consume allowance or exit attack mode", (
     unit:{id:"a1",weapons:[{range:2}]} };
   const enemy = { ...attacker,x:1,ownerID:"b",unit:{...attacker.unit,id:"b1"} };
   const corpse = { ...enemy,x:2,currentLife:0,unit:{...enemy.unit,id:"b2"} };
-  gameStore.setState({ accountID:"a",currentTurn:"a",status:"playing",unitID:"a1",attackMode:true,
+  gameStore.setState({ accountID:"a",currentTurn:"a",currentUnitID:"a1",status:"playing",unitID:"a1",attackMode:true,
     pending:false,players:{a:{units:[attacker]},b:{units:[enemy,corpse]}} });
   for (const [x,y] of [[0,1],[2,1],[2,0],[0,1]]) {
     gameStore.getState().attackPiece("a1",x,y);
@@ -331,6 +367,46 @@ test("empty slots do not send attacks, consume allowance or exit attack mode", (
   gameStore.getState().attackPiece("a1",0,1);
   assert.equal(sent.length,2);
   assert.equal(sent[1].payload.to.y,1);
+});
+
+test("unit turns guard all actions and select the next active unit on server updates", () => {
+  const sent = [];
+  let receive;
+  const require = createRequire(import.meta.url);
+  const socket = { subscribe(fn) { receive = fn; }, onStatus() {}, sendAction(type, payload) { sent.push({type,payload}); return true; } };
+  const types = { movePiece:"movePiece", attackPiece:"attackPiece", useAbility:"useAbility", endTurn:"endTurn" };
+  const { gameStore } = compile("store/GameSocket.ts", { require: (specifier) => {
+    if (specifier === "zustand") return require("zustand");
+    if (specifier === "@/api/webSocket/GameSocket") return { GameSocket:socket, MessageType:types };
+    if (specifier === "@/internal/game/combat") return compile("internal/game/combat.ts");
+    throw new Error(`Unexpected import ${specifier}`);
+  }});
+  const first = { x:0,y:0,ownerID:"a",currentLife:3,hasAttacked:false,unit:{id:"a1",weapons:[{range:2}]} };
+  const second = { ...first, y:1,unit:{...first.unit,id:"a2"} };
+  const enemy = { ...first, x:1,ownerID:"b",unit:{...first.unit,id:"b1"} };
+  const payload = { id:"round-test", revision:1, players:{a:{units:[first,second]},b:{units:[enemy]}}, board:[],
+    status:"playing", currentTurn:"a", currentUnitID:"a1", roundCounter:1, roundTurn:0,
+    roundOrder:[{playerID:"a",unitID:"a1"},{playerID:"b",unitID:"b1"},{playerID:"a",unitID:"a2"}] };
+  gameStore.setState({...payload,accountID:"a",unitID:"a2",pending:false});
+  gameStore.getState().movePiece("a2",2,1);
+  gameStore.getState().attackPiece("a2",1,1);
+  gameStore.getState().activateAbility("a2","shield",0,1);
+  assert.equal(sent.length,0);
+  gameStore.getState().movePiece("a1",0,2);
+  assert.equal(sent.at(-1).type,"movePiece");
+  gameStore.setState({pending:false,attackMode:true,skillMode:"grenade"});
+  receive({type:"gameStateUpdate",payload:{...payload,revision:2,currentTurn:"b",currentUnitID:"b1",roundTurn:1}});
+  assert.equal(gameStore.getState().unitID,"b1");
+  assert.equal(gameStore.getState().attackMode,false);
+  assert.equal(gameStore.getState().skillMode,null);
+  assert.equal(gameStore.getState().roundTurn,1);
+  gameStore.getState().movePiece("a1",0,3);
+  gameStore.getState().endTurn();
+  assert.equal(sent.length,1);
+  receive({type:"gameStateUpdate",payload:{...payload,revision:3,currentUnitID:"a2",roundTurn:2}});
+  assert.equal(gameStore.getState().unitID,"a2");
+  gameStore.getState().endTurn();
+  assert.equal(sent.at(-1).type,"endTurn");
 });
 
 test("each player has a distinct stable character model from the three sheet blocks", () => {

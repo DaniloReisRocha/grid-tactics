@@ -2,6 +2,7 @@ package models
 
 // The lab is a stateless simulation. Its tokens never enter multiplayer sessions.
 type SkillToken struct {
+	TurnCount int `json:"turnCount"`
 	Position
 	ID        string `json:"id"`
 	Team      int    `json:"team"`

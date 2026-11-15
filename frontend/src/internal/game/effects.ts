@@ -1,6 +1,7 @@
 import type { Weapon } from "@/api/models";
 
 export const EffectID = {
+  reload: "reloadTurn",
   knockback: "knockback",
   shieldBreak: "shieldBreak",
   noAdjacent: "noAdjacentTargets",
@@ -10,6 +11,11 @@ export const EffectID = {
   leap: "leap",
   areaDamageOrShieldBreak: "areaDamageOrShieldBreak",
 } as const;
+
+export function weaponReloading(weapon: Weapon | undefined, turnCount = 0) {
+  return Boolean(weapon?.effect?.some((effect) => effect.id === EffectID.reload)
+    && (turnCount <= 0 || turnCount % 2 === 1));
+}
 
 export function weaponEffectProblem(weapon: Weapon, distance: number, attackerHeight?: number, targetHeight?: number) {
   const has = (id: string) => (weapon.effect ?? []).some((effect) => effect.id === id);

@@ -12,7 +12,7 @@ func labFixture(weaponID string, targetX int) models.SkillsLabAttack {
 	return models.SkillsLabAttack{
 		Board: config.Board,
 		Tokens: []models.SkillToken{
-			{ID: "attacker", Team: 0, Position: models.Position{X: 4, Y: 5}, Life: 6, MaxLife: 6, WeaponID: weaponID},
+			{ID: "attacker", Team: 0, Position: models.Position{X: 4, Y: 5}, Life: 6, MaxLife: 6, WeaponID: weaponID, TurnCount: 2},
 			{ID: "target", Team: 1, Position: models.Position{X: targetX, Y: 5}, Life: 6, MaxLife: 6, Shield: 3, MaxShield: 3, WeaponID: models.WeaponPistolID},
 		},
 		AttackerID: "attacker", TargetID: "target",
@@ -68,6 +68,21 @@ func TestLabWeaponEffectsAndRepeatedAttacks(t *testing.T) {
 	input.Tokens = result.Tokens
 	if _, err := ResolveSkillsLabAttack(input); err == nil {
 		t.Fatal("dead target accepted")
+	}
+}
+
+func TestLabSniperReloadTurns(t *testing.T) {
+	for turn := 0; turn <= 4; turn++ {
+		input := labFixture(models.WeaponSniperID, 6)
+		input.Tokens[0].TurnCount = turn
+		before := append([]models.SkillToken(nil), input.Tokens...)
+		_, err := ResolveSkillsLabAttack(input)
+		if (err != nil) != (turn == 0 || turn%2 == 1) {
+			t.Fatalf("unexpected reload behavior on turn %d: %v", turn, err)
+		}
+		if !reflect.DeepEqual(before, input.Tokens) {
+			t.Fatal("reload/attack mutated input")
+		}
 	}
 }
 

@@ -31,6 +31,11 @@ func (weapon Weapon) HasEffect(id string) bool {
 	return false
 }
 
+// Reloading counts the wielder's turns, independently of shots fired or other units.
+func (weapon Weapon) Reloading(turnCount int) bool {
+	return weapon.HasEffect(EffectReloadID) && (turnCount <= 0 || turnCount%2 == 1)
+}
+
 // WeaponOptions returns independent copies of the available weapon definitions.
 // Penalties are reduction amounts: 1 means -1, and 0 means no penalty.
 // Each weapon owns its effect slice; catalog lookups never share mutable slices.
@@ -38,6 +43,7 @@ func WeaponOptions() []Weapon {
 	knockback, _ := EffectByID(EffectKnockbackID)
 	shieldBreak, _ := EffectByID(EffectShieldBreakID)
 	noAdjacent, _ := EffectByID(EffectNoAdjacentID)
+	reload, _ := EffectByID(EffectReloadID)
 	sameLevel, _ := EffectByID(EffectSameLevelID)
 	return []Weapon{
 		{
@@ -64,14 +70,14 @@ func WeaponOptions() []Weapon {
 		},
 		{
 			ID:             WeaponSniperID,
-			Effect:         []Effect{noAdjacent},
+			Effect:         []Effect{noAdjacent, reload},
 			Name:           "Rifle sniper",
 			Icon:           "🎯",
 			Damage:         3,
 			Range:          5,
 			StaminaPenalty: 1,
 			ToolPenalty:    1,
-			Description:    "Não pode causar dano a unidades adjacentes.",
+			Description:    "Não pode causar dano a unidades adjacentes. Alterna turnos de recarga e ataque, começando com recarga no primeiro turno da unidade.",
 		},
 		{
 			ID:             WeaponKatanaID,

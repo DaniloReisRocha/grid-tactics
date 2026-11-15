@@ -24,6 +24,11 @@ func startedSession(t *testing.T) (*GameSession, uuid.UUID, uuid.UUID) {
 	if err := s.AddPlayer(nil, b, []models.Unit{testUnit("b")}); err != nil {
 		t.Fatal(err)
 	}
+	// Keep combat fixtures predictable; round randomization is tested separately.
+	s.RoundOrder = []models.UnitTurn{{PlayerID: a, UnitID: "a"}, {PlayerID: b, UnitID: "b"}}
+	s.RoundTurn = 0
+	s.CurrentTurn = &a
+	s.CurrentUnitID = "a"
 	s.Board = []models.Cell{}
 	for y := 0; y < 10; y++ {
 		for x := 0; x < 10; x++ {

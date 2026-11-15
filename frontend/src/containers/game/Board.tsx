@@ -10,7 +10,7 @@ import { labAbilityProblem,combatSkillToken,abilityArea } from "@/internal/game/
 
 export const Board = () => {
   const { id, board, players, turnOrder, unitID, setUnit, movePiece, attackPiece, attackMode,
-    accountID, currentTurn, pending, status, connection,skillMode,activateAbility,matchAbilityUses } = useGameSocket();
+    accountID, currentTurn, currentUnitID, pending, status, connection,skillMode,activateAbility,matchAbilityUses } = useGameSocket();
   const [hovered, setHovered] = useState<MapTile | null>(null);
   const units = useMemo(() => Object.values(players).flatMap((player) => player.units), [players]);
   const lookup = useMemo(() => new Map(board.map((tile) => [positionKey(tile), tile])), [board]);
@@ -19,6 +19,7 @@ export const Board = () => {
   const selectedToken=skillTokens.find((unit)=>unit.id===unitID);
   const activeSkill=selected?.unit.abilities?.find((item)=>item.id===skillMode);
   const canAct = Boolean(selected && selected.ownerID === accountID && selected.currentLife > 0
+    && selected.unit.id === currentUnitID
     && currentTurn === accountID && status === "playing" && connection === "connected" && !pending);
   const options = useMemo(() => selected && canAct && !skillMode ? movementOptions(board, selected, units) : null, [board, selected, units, canAct,skillMode]);
   const living = useMemo(() => new Map(units.filter((unit) => unit.currentLife > 0).map((unit) => [positionKey(unit), unit])), [units]);
@@ -49,8 +50,9 @@ export const Board = () => {
       life: unit.currentLife, shield: unit.currentShield,
       movementMode:unit.movementMode,
       ...appearance, defeated, selected: !defeated && unit.unit.id === unitID,
+      activeTurn: !defeated && unit.unit.id === currentUnitID,
     }];
-  }), [units, lookup, turnOrder, id, unitID]);
+  }), [units, lookup, turnOrder, id, unitID, currentUnitID]);
   const width = Math.max(1, ...board.map((cell) => cell.x + 1));
   const height = Math.max(1, ...board.map((cell) => cell.y + 1));
 

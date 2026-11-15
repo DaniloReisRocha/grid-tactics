@@ -29,7 +29,7 @@ export default function AbilitySelector({ abilities, value, onChange, disabled, 
               <option value="">Nenhuma</option>
               {abilities.map((item) => <option key={item.id} value={item.id}
                 disabled={value.some((id, index) => index !== slot && id === item.id)}>
-                {item.icon} {item.name}
+                {item.icon} {item.name}{item.passive ? " (passiva)" : ""}
               </option>)}
             </select>
           </label>
@@ -38,6 +38,7 @@ export default function AbilitySelector({ abilities, value, onChange, disabled, 
       {!addingToken ? <div className="lab-skill-actions">{value.filter(Boolean).map((id) => {
         const item = abilities.find((entry) => entry.id === id);
         if (!item) return null;
+        if (item.passive) return <div key={id}><small>{item.icon} {item.name} · Passiva — aplicada automaticamente.</small></div>;
         const problem = activationProblem(item);
         return <div key={id}>
           <button type="button" disabled={disabled || !!problem} title={problem ?? item.description}
@@ -50,7 +51,7 @@ export default function AbilitySelector({ abilities, value, onChange, disabled, 
         <strong>{ability.icon} {ability.name}</strong>
         <p>{ability.description}</p>
         <dl className="lab-skill-stats">
-          <div><dt>Uso</dt><dd>{ability.uses === "single" ? "Único" : "Ilimitado"}</dd></div>
+          <div><dt>Uso</dt><dd>{ability.passive ? "Passiva" : ability.uses === "single" ? "Único" : "Ilimitado"}</dd></div>
           <div><dt>Alcance</dt><dd>{ability.range === 0 ? "Própria unidade" : `${ability.range} terreno(s)`}</dd></div>
           {ability.shield > 0 ? <div><dt>Escudo</dt><dd>{ability.shield}</dd></div> : null}
           {ability.damage > 0 ? <div><dt>Dano</dt><dd>{ability.damage}</dd></div> : null}

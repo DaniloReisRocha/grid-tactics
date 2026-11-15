@@ -21,6 +21,7 @@ type AbilityMovement struct {
 }
 
 type Ability struct {
+	Passive           bool             `json:"passive"`
 	ID                string           `json:"id"`
 	Name              string           `json:"name"`
 	Icon              string           `json:"icon"`
@@ -57,8 +58,8 @@ func AbilityOptions() []Ability {
 	return []Ability{
 		{
 			ID: AbilityShieldID, Name: "Escudo", Icon: "🛡️", Uses: AbilityUsageSingle,
-			Shield:      UnitShieldCapacity,
-			Description: "A unidade recebe um escudo equivalente a 3 pontos de vida.",
+			Shield: UnitShieldCapacity, Passive: true,
+			Description: "Passiva: a unidade inicia a partida com 3 pontos de escudo. A proteção não se regenera entre turnos ou rounds.",
 			Effect:      []Effect{grantShield},
 		},
 		{

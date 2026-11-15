@@ -10,6 +10,7 @@ export interface MapActor {
   model: CharacterModel;
   color: string;
   selected: boolean;
+  activeTurn?: boolean;
   defeated: boolean;
   movementMode?: "jump" | "";
 }

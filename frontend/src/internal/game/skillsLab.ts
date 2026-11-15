@@ -3,12 +3,14 @@ import type { SkillToken } from "@/api/skillsLab";
 import { isWalkable } from "@/components/ProceduralMap/characterMovement";
 import { directAttackProblem } from "./attackLine";
 import { effectiveStamina } from "./stamina";
+import { weaponReloading } from "./effects";
 
 export function labAttackProblem(attacker: SkillToken, target: SkillToken | undefined, board: Cell[], weapons: Weapon[], position?: Position) {
   if (attacker.life <= 0) return "Escolha um atacante vivo.";
   const point=position??target;
   const weapon=weapons.find((item)=>item.id===attacker.weaponID);
   if (!weapon) return "Equipe uma arma no atacante.";
+  if (weaponReloading(weapon, attacker.turnCount)) return "Arma em recarga. Avance o turno do token para atacar.";
   if (point && board.some((tile)=>tile.x===point.x&&tile.y===point.y&&tile.object==="barricade")) return directAttackProblem(attacker,point,weapon,board);
   if (!target || target.life <= 0) return "Clique em um token vivo da outra equipe.";
   if (attacker.team === target.team) return "Escolha um alvo da outra equipe.";
@@ -32,6 +34,7 @@ export function labStamina(token: SkillToken, weapons: Weapon[], baseStamina = 4
 
 export function labMovementUnit(token: SkillToken, weapons: Weapon[], baseStamina = 4): UnitInstance {
   return {
+    turnCount: token.turnCount ?? 1,
     x: token.x, y: token.y, player: token.team, ownerID: String(token.team),
     currentLife: token.life, currentShield: token.shield, currentStamina: labStamina(token, weapons, baseStamina).current,
     hasAttacked: false, path: token.path,
@@ -54,5 +57,6 @@ export function starterTokens(board: Cell[], weapons: Weapon[]): SkillToken[] {
     id: `starter-${index + 1}`, x: tile.x, y: tile.y, team: index === 0 ? 0 : 1,
     model: index as 0 | 1 | 2, life: 6, shield: 3, maxLife: 6, maxShield: 3,
     weaponID: weapons[0]?.id ?? "pistol", abilityIDs: [], staminaSpent: 0, path: [],
+    turnCount: 1,
   }));
 }

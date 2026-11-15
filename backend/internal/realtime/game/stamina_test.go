@@ -25,11 +25,13 @@ func TestWeaponPenaltyReducesSpawnAndTurnStamina(t *testing.T) {
 				t.Fatal("spawn ignored equipped weapon penalty")
 			}
 			s.Players[a].Units[0].CurrentStamina = 0
-			if err := s.EndTurn(a); err != nil {
-				t.Fatal(err)
-			}
-			if err := s.EndTurn(b); err != nil {
-				t.Fatal(err)
+			for {
+				if err := s.EndTurn(*s.CurrentTurn); err != nil {
+					t.Fatal(err)
+				}
+				if *s.CurrentTurn == a {
+					break
+				}
 			}
 			if s.Players[a].Units[0].CurrentStamina != expected || s.Players[a].Units[0].Unit.Stamina != 4 {
 				t.Fatal("turn reset ignored penalty or modified base stamina")
