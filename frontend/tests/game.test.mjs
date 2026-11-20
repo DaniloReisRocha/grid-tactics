@@ -506,6 +506,32 @@ test("adjacent attacks allow eight cells and block either structure at a diagona
   }
 });
 
+test("terrain blocks attack lines and area previews without blocking equal-height plateaus", () => {
+  const {directAttackProblem,attackableArea} = compile("internal/game/attackLine.ts");
+  const {isAttackTarget} = compile("internal/game/combat.ts");
+  const {labAttackProblem} = compile("internal/game/skillsLab.ts");
+  const weapon={id:"pistol",range:5,effect:[]};
+  const attacker={x:3,y:3,ownerID:"a",currentLife:3,hasAttacked:false,unit:{weapons:[weapon]}};
+  const target={...attacker,x:5,ownerID:"b"};
+  const token={...attacker,team:0,life:3,weaponID:"pistol"};
+  for (const [sourceHeight,targetHeight,middleHeight,blocked] of [[0,0,1,true],[0,0,0,false],[1,1,1,false],[1,1,2,true],[2,0,0,false],[2,0,1,true]]) {
+    const board=Array.from({length:49},(_,i)=>({x:i%7,y:Math.floor(i/7),height:0,terrain:"grass"}));
+    board[24].height=sourceHeight; board[26].height=targetHeight; board[25].height=middleHeight;
+    assert.equal(Boolean(directAttackProblem(attacker,target,weapon,board)),blocked);
+    assert.equal(isAttackTarget(attacker,target,board),!blocked);
+    assert.equal(attackableArea(attacker,weapon,board).has("5,3"),!blocked);
+    assert.equal(Boolean(labAttackProblem(token,{...target,team:1,life:3},board,[weapon])),blocked);
+  }
+  for (const [dx,dy] of [[1,1],[-1,1],[1,-1],[-1,-1]]) for (const side of [0,1]) {
+    const board=Array.from({length:49},(_,i)=>({x:i%7,y:Math.floor(i/7),height:1,terrain:"grass"}));
+    const diagonal={...target,x:3+dx,y:3+dy};
+    assert.equal(directAttackProblem(attacker,diagonal,weapon,board),null);
+    board[(side ? diagonal.y : attacker.y)*7+(side ? attacker.x : diagonal.x)].height=2;
+    assert.ok(directAttackProblem(attacker,diagonal,weapon,board));
+    assert.equal(attackableArea(attacker,weapon,board).has(`${diagonal.x},${diagonal.y}`),false);
+  }
+});
+
 test("sniper higher-target restriction matches attack previews, highlighted area and lab", () => {
   const {weaponEffectProblem} = compile("internal/game/effects.ts");
   const {attackableArea} = compile("internal/game/attackLine.ts");
@@ -514,7 +540,8 @@ test("sniper higher-target restriction matches attack previews, highlighted area
   const sniper={id:"sniper",range:5,effect:[{id:"noHigherTargets"},{id:"noAdjacentTargets"},{id:"reloadTurn"}]};
   assert.ok(weaponEffectProblem(sniper,2,undefined,1));
   for (const fromHeight of [0,1,2]) for (const targetHeight of [0,1,2]) {
-    const board=Array.from({length:49},(_,i)=>({x:i%7,y:Math.floor(i/7),height:fromHeight,terrain:"grass"}));
+    const board=Array.from({length:49},(_,i)=>({x:i%7,y:Math.floor(i/7),height:0,terrain:"grass"}));
+    board[3*7+3].height=fromHeight;
     board[3*7+5].height=targetHeight;
     const attacker={x:3,y:3,ownerID:"a",currentLife:3,turnCount:2,hasAttacked:false,unit:{weapons:[sniper]}};
     const target={...attacker,x:5,ownerID:"b"};

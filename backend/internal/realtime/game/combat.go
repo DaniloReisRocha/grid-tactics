@@ -53,7 +53,7 @@ func (s *GameSession) Attack(id uuid.UUID, unitID string, target models.Position
 		return err
 	}
 	if !DirectAttackLineClear(attacker.Position, target, cells) {
-		return errors.New("uma estrutura bloqueia a linha de ataque")
+		return errors.New("uma estrutura ou o relevo bloqueia a linha de ataque")
 	}
 	if to.Object == models.ObjectBarricade {
 		for i := range s.Board {

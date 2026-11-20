@@ -95,7 +95,7 @@ func ResolveSkillsLabAttack(input models.SkillsLabAttack) (models.SkillsLabResul
 		return result, err
 	}
 	if !game.DirectAttackLineClear(attacker.Position, targetPosition, cells) {
-		return result, errors.New("uma estrutura bloqueia a linha de ataque")
+		return result, errors.New("uma estrutura ou o relevo bloqueia a linha de ataque")
 	}
 	if to.Object == models.ObjectBarricade {
 		result.Board = append([]models.Cell(nil), input.Board...)

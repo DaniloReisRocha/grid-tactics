@@ -34,6 +34,19 @@ func TestLabBarricadeBlocksThenBreaksWithoutUnitTarget(t *testing.T) {
 	}
 }
 
+func TestLabReliefBlocksDirectFireWithoutConsumingAttack(t *testing.T) {
+	input := labFixture(models.WeaponPistolID, 6)
+	input.Board[5*15+5].Height = 1
+	if _, err := ResolveSkillsLabAttack(input); err == nil {
+		t.Fatal("lab fired through elevated ground")
+	}
+	input.Board[5*15+4].Height = 1
+	input.Board[5*15+6].Height = 1
+	if _, err := ResolveSkillsLabAttack(input); err != nil {
+		t.Fatal("same-level plateau blocked attack", err)
+	}
+}
+
 func TestLabCannotDestroyBarricadeThroughAnotherStructure(t *testing.T) {
 	for _, object := range []string{models.ObjectHouse, models.ObjectRuin, models.ObjectBarricade} {
 		input := labFixture(models.WeaponPistolID, 7)
