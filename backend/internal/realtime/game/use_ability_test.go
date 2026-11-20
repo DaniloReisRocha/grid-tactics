@@ -97,4 +97,7 @@ func TestMultiplayerGrenadeCanEliminateBothTeams(t *testing.T) {
 	if s.Status != models.GameStatusFinished || s.Winner != nil || s.CurrentTurn != nil || s.MatchAbilityUses[grenade.ID] != 1 {
 		t.Fatal("simultaneous elimination was not recorded")
 	}
+	if s.GrenadeEvent == nil || s.GrenadeEvent.Position != unit.Position {
+		t.Fatal("finishing grenade lost its explosion event")
+	}
 }

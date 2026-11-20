@@ -41,6 +41,7 @@ export type UnitInstance = Position & {
 };
 export type Player = { name: string; accoID: string; connected: boolean; units: UnitInstance[] };
 export type GameStatePayload = {
+  grenadeEvent: (Position & { id: number; createdAtMS: number }) | null;
   serverTimeMS: number; turnDeadlineMS: number; turnRemainingMS: number;
   orbs: (Position & { id: string; triggered: boolean; collectedBy?: string })[];
   currentUnitID: string; roundCounter: number; roundTurn: number;

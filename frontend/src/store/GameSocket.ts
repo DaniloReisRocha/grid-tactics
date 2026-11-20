@@ -4,8 +4,10 @@ import type { GameStatePayload } from "@/api/models";
 import type { UnitLoadout } from "@/api/team";
 import { GameSocket, MessageType } from "@/api/webSocket/GameSocket";
 import { canUnitAttack, isAttackTarget, isBarricadeTarget } from "@/internal/game/combat";
+import type { MapExplosion } from "@/components/ProceduralMap/types";
 
 const emptyGame: GameStatePayload = {
+  grenadeEvent: null,
   serverTimeMS: 0, turnDeadlineMS: 0, turnRemainingMS: 0,
   orbs: [],
   currentUnitID: "", roundCounter: 0, roundTurn: 0, roundOrder: [],
@@ -14,6 +16,8 @@ const emptyGame: GameStatePayload = {
   matchAbilityUses: {},
 };
 type GameStore = GameStatePayload & {
+  grenadeExplosions: MapExplosion[];
+  finishGrenadeExplosion: (id: string) => void;
   serverClockOffsetMS: number;
   accountID: string; unitID: string | null; attackMode: boolean;
   skillMode: string | null;
@@ -41,6 +45,8 @@ export const gameStore = create<GameStore>((set, get) => {
   return {
     ...emptyGame, accountID: "", unitID: null, attackMode: false, skillMode: null,
     serverClockOffsetMS: 0,
+    grenadeExplosions: [],
+    finishGrenadeExplosion: (id) => set((state) => ({grenadeExplosions: state.grenadeExplosions.filter((item) => item.id !== id)})),
     connection: ConnectionStatus.disconnected, error: null, pending: false,
     setUnit: (unitID) => set({ unitID, attackMode: false, skillMode: null }),
     setAttackMode: (attackMode) => set({ attackMode, skillMode: null }),
@@ -48,13 +54,13 @@ export const gameStore = create<GameStore>((set, get) => {
     activateAbility: (unitID,abilityID,x,y) => act(MessageType.useAbility,{unitID,abilityID,to:{x,y}}),
     clearError: () => set({ error: null }),
     joinGame: (sessionID, accountID, team) => {
-      set({ ...emptyGame, id: sessionID, accountID, unitID: null, attackMode: false, skillMode:null, error: null, pending: false });
+      set({ ...emptyGame, grenadeExplosions: [], id: sessionID, accountID, unitID: null, attackMode: false, skillMode:null, error: null, pending: false });
       GameSocket.connect(sessionID, accountID, team);
     },
     leaveGame: (forfeit = false) => {
       if (forfeit) GameSocket.sendAction(MessageType.leaveGame);
       GameSocket.disconnect();
-      set({ ...emptyGame, accountID: "", unitID: null, attackMode: false, skillMode:null, error: null, pending: false });
+      set({ ...emptyGame, grenadeExplosions: [], accountID: "", unitID: null, attackMode: false, skillMode:null, error: null, pending: false });
     },
     movePiece: (unitID, x, y) => act(MessageType.movePiece, { unitID, to: { x, y } }),
     attackPiece: (unitID, x, y) => {
@@ -81,8 +87,12 @@ GameSocket.subscribe((message) => {
     if (payload.id !== state.id || payload.revision < state.revision) return;
     const selected = Object.values(payload.players).flatMap((player) => player.units)
       .find((unit) => unit.unit.id === state.unitID && unit.currentLife > 0);
+    const explosion = payload.grenadeEvent;
+    const newExplosion = explosion && state.revision >= 0 && explosion.id !== state.grenadeEvent?.id
+      && payload.serverTimeMS - explosion.createdAtMS <= 5000;
     gameStore.setState({
       ...payload, pending: false, error: null,
+      grenadeExplosions: newExplosion ? [...state.grenadeExplosions, {...explosion, id: String(explosion.id)}] : state.grenadeExplosions,
       serverClockOffsetMS: payload.serverTimeMS ? payload.serverTimeMS - Date.now() : 0,
       skillMode: null,
       board: JSON.stringify(payload.board) === JSON.stringify(state.board) ? state.board : payload.board,

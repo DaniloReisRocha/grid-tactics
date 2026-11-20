@@ -56,6 +56,7 @@ type UnitTurn struct {
 }
 
 type GameStatePayload struct {
+	GrenadeEvent     *GrenadeEvent         `json:"grenadeEvent"`
 	ServerTimeMS     int64                 `json:"serverTimeMS"`
 	TurnDeadlineMS   int64                 `json:"turnDeadlineMS"`
 	TurnRemainingMS  int64                 `json:"turnRemainingMS"`

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import ProceduralMap from "@/components/ProceduralMap";
 import { isWalkable } from "@/components/ProceduralMap/characterMovement";
 import type { MapTile } from "@/components/ProceduralMap/generator";
-import type { CharacterModel, MapActor, MapOrb } from "@/components/ProceduralMap/types";
+import type { CharacterModel, MapActor, MapOrb, MapExplosion } from "@/components/ProceduralMap/types";
 import { attackInLab, activateAbilityInLab, loadLab, type LabConfig, type LabLayout, type SkillToken } from "@/api/skillsLab";
 import { movementOptions, positionKey } from "@/internal/game/pathfinding";
 import { labAttackProblem, labMovementUnit, labStamina, starterTokens } from "@/internal/game/skillsLab";
@@ -30,6 +30,7 @@ export default function SkillsLab() {
   const [config, setConfig] = useState<LabConfig | null>(null);
   const [tokens, setTokens] = useState<SkillToken[]>([]);
   const [orbs, setOrbs] = useState<MapOrb[]>([]);
+  const [explosions, setExplosions] = useState<MapExplosion[]>([]);
   const collectedOrbs = useRef(new Set<string>());
   const orbRevision = useRef(0);
   const unitOrbRevision = useRef(new Map<string, number>());
@@ -69,6 +70,7 @@ export default function SkillsLab() {
       initial.current = structuredClone({ config: data, tokens: starters });
       setConfig(data); setTokens(starters); setSelectedID(starters[0]?.id ?? null);
       setOrbs([]);
+      setExplosions([]);
       collectedOrbs.current.clear(); unitOrbRevision.current.clear(); orbRevision.current = 0;
       setWeaponID(data.weapons[0]?.id ?? "pistol"); setTool("select");
       setAbilityIDs([]);
@@ -155,6 +157,9 @@ export default function SkillsLab() {
     try {
       const result = await activateAbilityInLab(board,tokens,selected.id,id,target,matchAbilityUses,controller.signal);
       if (!controller.signal.aborted) {
+        if (ability?.effect.some((effect) => effect.id === EffectID.areaDamageOrShieldBreak)) {
+          setExplosions((items) => [...items, {id: crypto.randomUUID(), x: target.x, y: target.y}]);
+        }
         setConfig((current) => current ? {...current,board:result.board} : current);
         setTokens(preserveOrbRecoveries(result.tokens, requestOrbRevision)); setMatchAbilityUses(result.matchAbilityUses); addLog(result.message);
         setActiveAbilityID(null); setTool("select"); setHovered(null);
@@ -267,6 +272,7 @@ export default function SkillsLab() {
   };
   const reset = () => {
     setOrbs([]);
+    setExplosions([]);
     collectedOrbs.current.clear(); unitOrbRevision.current.clear(); orbRevision.current = 0;
     if (!initial.current) return;
     const snapshot = structuredClone(initial.current);
@@ -295,7 +301,8 @@ export default function SkillsLab() {
               onClick={() => { setTool(item.id); setHovered(null); setError(null); }}>{item.label}</button>)}
           </div>
           <p className="lab-hint" role="status">{pending ? "Preparando o teste…" : tool === "skill" ? `${activeAbility?.name}: clique no terreno alvo. Os destinos válidos estão destacados ao passar o mouse; a granada mostra a área da explosão.` : TOOLS.find((item) => item.id === tool)?.hint}</p>
-          {config ? <ProceduralMap key={version} width={15} height={15} tiles={board} actors={actors} orbs={orbs} className="lab-map"
+          {config ? <ProceduralMap key={version} width={15} height={15} tiles={board} actors={actors} orbs={orbs} explosions={explosions} className="lab-map"
+            onExplosionComplete={(id) => setExplosions((items) => items.filter((item) => item.id !== id))}
             onOrbComplete={(id) => setOrbs((items) => items.filter((orb) => orb.id !== id))}
             interaction={{ selectable, attackTargets, attackArea: tool === "attack" ? attackArea : undefined, onHover: setHovered, onActorTileEnter: triggerOrb, onSelect: (tile) => { void onSelect(tile); },
               area: tool === "skill" && hovered && selectable.has(positionKey(hovered)) ? abilityArea(activeAbility,hovered,board) : [],

@@ -21,6 +21,7 @@ type PlayerState struct {
 }
 
 type GameSession struct {
+	GrenadeEvent     *models.GrenadeEvent
 	TurnDeadline     time.Time
 	turnRemaining    time.Duration
 	turnTimer        *time.Timer
@@ -97,7 +98,13 @@ func (s *GameSession) BroadcastState() error {
 		id := *s.Winner
 		winner = &id
 	}
+	var grenadeEvent *models.GrenadeEvent
+	if s.GrenadeEvent != nil {
+		copyEvent := *s.GrenadeEvent
+		grenadeEvent = &copyEvent
+	}
 	payload := models.GameStatePayload{
+		GrenadeEvent: grenadeEvent,
 		ServerTimeMS: time.Now().UnixMilli(), TurnRemainingMS: s.turnRemaining.Milliseconds(),
 		Orbs:       append([]models.Orb{}, s.Orbs...),
 		RoundOrder: append([]models.UnitTurn{}, s.RoundOrder...), RoundCounter: s.RoundCounter,

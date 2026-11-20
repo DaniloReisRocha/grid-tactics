@@ -310,6 +310,11 @@ func TestOrbSpawnCollectionAndReconnectAreSynchronized(t *testing.T) {
 			}
 		}
 	}
+	sendAction(t, clients[owner], useAbility, useAbilityAction{UnitID: actorID, AbilityID: grenade.ID, To: orb.Position})
+	one, two = readState(t, clients[a], models.GameStatusPlaying), readState(t, clients[b], models.GameStatusPlaying)
+	if one.GrenadeEvent == nil || !reflect.DeepEqual(one.GrenadeEvent, two.GrenadeEvent) || one.GrenadeEvent.Position != orb.Position {
+		t.Fatal("grenade animation event not synchronized")
+	}
 	other := a
 	if owner == a {
 		other = b
@@ -323,6 +328,9 @@ func TestOrbSpawnCollectionAndReconnectAreSynchronized(t *testing.T) {
 	readState(t, clients[other], models.GameStatusPlaying)
 	if !reflect.DeepEqual(state.Orbs, one.Orbs) {
 		t.Fatal("reconnect reset orb state")
+	}
+	if !reflect.DeepEqual(state.GrenadeEvent, one.GrenadeEvent) {
+		t.Fatal("reconnect changed detonation event identity")
 	}
 }
 

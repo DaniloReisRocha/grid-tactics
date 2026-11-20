@@ -14,7 +14,7 @@ import TurnTimer from "./TurnTimer";
 import { attackableArea } from "@/internal/game/attackLine";
 
 export const Board = () => {
-  const { id, board, players, orbs, turnOrder, unitID, setUnit, movePiece, attackPiece, attackMode,
+  const { id, board, players, orbs, grenadeExplosions, finishGrenadeExplosion, turnOrder, unitID, setUnit, movePiece, attackPiece, attackMode,
     accountID, currentTurn, currentUnitID, pending, status, connection,skillMode,activateAbility,matchAbilityUses } = useGameSocket();
   const [hovered, setHovered] = useState<MapTile | null>(null);
   const units = useMemo(() => Object.values(players).flatMap((player) => player.units), [players]);
@@ -76,6 +76,7 @@ export const Board = () => {
       width={width} height={height}
       tiles={board} actors={actors}
       orbs={orbView.orbs} onOrbComplete={orbView.onOrbComplete}
+      explosions={grenadeExplosions} onExplosionComplete={finishGrenadeExplosion}
       topLeftOverlay={<TurnTimer />}
       style={{ flex: "1 1 650px", minWidth: 0, height: "max(540px, calc(100vh - 140px))", borderRadius: 12 }}
       interaction={{

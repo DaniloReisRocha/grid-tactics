@@ -2,6 +2,7 @@ import type { MapTile } from "./generator";
 
 export type CharacterModel = 0 | 1 | 2;
 export interface MapOrb { id: string; x: number; y: number; triggered: boolean }
+export interface MapExplosion { id: string; x: number; y: number }
 export interface MapActor {
   id: string;
   tile: MapTile;

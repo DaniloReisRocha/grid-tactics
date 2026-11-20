@@ -2,6 +2,7 @@ package game
 
 import (
 	"errors"
+	"time"
 
 	"github.com/DaniloReisRocha/grid-tactics/backend/models"
 	"github.com/gofrs/uuid"
@@ -63,6 +64,9 @@ func (s *GameSession) UseAbility(id uuid.UUID, unitID, abilityID string, target 
 	}
 	s.Board = result.Board
 	s.MatchAbilityUses = result.MatchAbilityUses
+	if ability.HasEffect(models.EffectAreaDamageOrShieldBreakID) {
+		s.GrenadeEvent = &models.GrenadeEvent{ID: s.Revision + 1, Position: target, CreatedAtMS: time.Now().UnixMilli()}
+	}
 	if actor.Position != from {
 		s.collectOrbs(actor, []models.Position{actor.Position})
 	}

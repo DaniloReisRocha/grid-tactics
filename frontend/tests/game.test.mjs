@@ -28,6 +28,49 @@ test("HTTP API uses its own URL independently of the WebSocket host", () => {
   assert.equal(backendURL("/api/skills-lab").href, "https://api.example.test/api/skills-lab");
 });
 
+test("grenade animation runs all ten frames in numeric order and finishes once", () => {
+  const {grenadeFrame} = compile("components/ProceduralMap/grenadeAnimation.ts");
+  for (let index=0; index<10; index++) {
+    assert.equal(grenadeFrame(index*90),index);
+    assert.equal(grenadeFrame(index*90+89),index);
+  }
+  assert.equal(grenadeFrame(900),null);
+  assert.equal(grenadeFrame(1800),null);
+});
+
+test("confirmed grenade events animate once, queue separate throws, and skip historical snapshots", () => {
+  let receive;
+  const require = createRequire(import.meta.url);
+  const socket={subscribe(fn){receive=fn;},onStatus(){}};
+  const {gameStore}=compile("store/GameSocket.ts",{require:(specifier)=>{
+    if (specifier==="zustand") return require("zustand");
+    if (specifier==="@/api/status") return compile("api/status.ts");
+    if (specifier==="@/api/webSocket/GameSocket") return {GameSocket:socket,MessageType:{}};
+    if (specifier==="@/internal/game/combat") return compile("internal/game/combat.ts");
+    throw new Error(`Unexpected import ${specifier}`);
+  }});
+  gameStore.setState({id:"grenade-session",revision:-1});
+  const snapshot={id:"grenade-session",revision:1,serverTimeMS:10000,players:{},board:[],status:"playing",currentTurn:null,currentUnitID:""};
+  const send=(revision,event)=>receive({type:"gameStateUpdate",payload:{...snapshot,revision,grenadeEvent:event}});
+  send(1,{id:1,x:2,y:3,createdAtMS:10000});
+  assert.equal(gameStore.getState().grenadeExplosions.length,0); // Initial/reconnection snapshot.
+  send(2,{id:2,x:4,y:5,createdAtMS:10000});
+  assert.equal(gameStore.getState().grenadeExplosions.length,1);
+  assert.equal(gameStore.getState().grenadeExplosions[0].x,4);
+  send(3,{id:2,x:4,y:5,createdAtMS:10000});
+  assert.equal(gameStore.getState().grenadeExplosions.length,1);
+  send(4,{id:3,x:5,y:5,createdAtMS:10000});
+  assert.equal(gameStore.getState().grenadeExplosions.length,2);
+  gameStore.getState().finishGrenadeExplosion("2");
+  assert.equal(gameStore.getState().grenadeExplosions.length,1);
+  gameStore.getState().finishGrenadeExplosion("3");
+  assert.equal(gameStore.getState().grenadeExplosions.length,0);
+  send(5,{id:4,x:4,y:5,createdAtMS:1});
+  assert.equal(gameStore.getState().grenadeExplosions.length,0); // Stale event.
+  receive({type:"actionFailed",payload:{message:"Alvo inválido"}});
+  assert.equal(gameStore.getState().grenadeExplosions.length,0);
+});
+
 test("orbs loop only spawn frames and finish their burst exactly once", () => {
   const {orbFrame} = compile("components/ProceduralMap/orbAnimation.ts");
   for (const [elapsed,expected] of [[0,2],[180,3],[360,4],[540,3],[720,2],[1440,2]]) {

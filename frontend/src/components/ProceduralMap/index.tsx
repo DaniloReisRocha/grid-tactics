@@ -4,8 +4,9 @@ import { Assets, Container, Graphics, Polygon, Sprite, type FederatedPointerEven
 import Minimap from "./Minimap";
 import MapActorRenderer from "./MapActor";
 import Orb from "./Orb";
+import GrenadeExplosion from "./GrenadeExplosion";
 import StructureOcclusion, { type OccludingStructure } from "./StructureOcclusion";
-import type { MapActor, MapInteraction, MapOrb } from "./types";
+import type { MapActor, MapInteraction, MapOrb, MapExplosion } from "./types";
 import { tileKey } from "./characterMovement";
 import { projectPosition, viewDepth } from "./projection";
 import {
@@ -25,6 +26,7 @@ extend({ Container, Graphics, Sprite });
 
 const EMPTY_ACTORS: readonly MapActor[] = [];
 const EMPTY_ORBS: readonly MapOrb[] = [];
+const EMPTY_EXPLOSIONS: readonly MapExplosion[] = [];
 
 export interface ProceduralMapProps {
   /** Number of columns, in tiles. */
@@ -36,6 +38,8 @@ export interface ProceduralMapProps {
   actors?: readonly MapActor[];
   orbs?: readonly MapOrb[];
   onOrbComplete?: (id: string) => void;
+  explosions?: readonly MapExplosion[];
+  onExplosionComplete?: (id: string) => void;
   interaction?: MapInteraction;
   /** Show the top-down overview in the corner. */
   showMinimap?: boolean;
@@ -54,6 +58,8 @@ export default function ProceduralMap({
   actors = EMPTY_ACTORS,
   orbs = EMPTY_ORBS,
   onOrbComplete,
+  explosions = EMPTY_EXPLOSIONS,
+  onExplosionComplete,
   interaction,
   showMinimap = true,
   className,
@@ -285,6 +291,11 @@ export default function ProceduralMap({
               const tile = providedTiles.find((cell) => cell.x === orb.x && cell.y === orb.y);
               return tile ? <Orb key={orb.id} tile={tile} triggered={orb.triggered} view={view}
                 onComplete={() => onOrbComplete?.(orb.id)} onError={reportCharacterError} /> : null;
+            })}
+            {explosions.map((explosion) => {
+              const tile = providedTiles.find((cell) => cell.x === explosion.x && cell.y === explosion.y);
+              return tile ? <GrenadeExplosion key={explosion.id} tile={tile} view={view}
+                onComplete={() => onExplosionComplete?.(explosion.id)} onError={reportCharacterError} /> : null;
             })}
             <StructureOcclusion structures={structures} selectedSprite={selectedSprite} selectedElevation={selectedElevation} />
           </pixiContainer>
