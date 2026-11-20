@@ -162,7 +162,7 @@ func TestGrenadeSelfEliminationAdvancesActiveUnit(t *testing.T) {
 	if err := s.UseAbility(a, actor.Unit.ID, grenade.ID, actor.Position); err != nil {
 		t.Fatal(err)
 	}
-	if s.Status != "playing" || actor.CurrentLife != 0 || s.CurrentUnitID != "1-0" || *s.CurrentTurn != b {
+	if s.Status != models.GameStatusPlaying || actor.CurrentLife != 0 || s.CurrentUnitID != "1-0" || *s.CurrentTurn != b {
 		t.Fatal("match stuck on eliminated actor")
 	}
 }

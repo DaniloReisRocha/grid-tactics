@@ -1,15 +1,19 @@
 package game
 
 import (
+	"errors"
 	"github.com/DaniloReisRocha/grid-tactics/backend/internal/realtime"
 	"github.com/DaniloReisRocha/grid-tactics/backend/models"
 	"github.com/gofrs/uuid"
 	"math/rand"
 )
 
-func (s *GameSession) EndTurn(id uuid.UUID) error {
+func (s *GameSession) EndTurn(id uuid.UUID, expectedTurn ...int) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+	if len(expectedTurn) > 0 && expectedTurn[0] != s.TurnCounter {
+		return errors.New("este turno já foi encerrado")
+	}
 	if _, err := s.actingPlayer(id); err != nil {
 		return err
 	}
@@ -78,6 +82,7 @@ func (s *GameSession) beginUnitTurn() {
 	unit.CurrentStamina = unit.Unit.EffectiveStamina()
 	unit.HasAttacked = false
 	unit.TurnCount++
+	s.startTurnClock(TurnDuration)
 }
 
 func (s *GameSession) advanceUnitTurn() {
@@ -91,6 +96,7 @@ func (s *GameSession) advanceUnitTurn() {
 	if s.RoundTurn >= len(s.RoundOrder) {
 		s.CurrentTurn = nil
 		s.CurrentUnitID = ""
+		s.clearTurnClock()
 		return
 	}
 	s.beginUnitTurn()
@@ -106,7 +112,7 @@ func (s *GameSession) Disconnect(conn *realtime.WSConnection, leave bool) {
 		}
 		p.Connection = nil
 		p.Connected = false
-		if s.Status == "waiting" {
+		if s.Status == models.GameStatusWaiting {
 			delete(s.Players, id)
 			for i, turn := range s.TurnOrder {
 				if turn == id {
@@ -114,8 +120,9 @@ func (s *GameSession) Disconnect(conn *realtime.WSConnection, leave bool) {
 					break
 				}
 			}
-		} else if s.Status != "finished" {
-			s.Status = "paused"
+		} else if s.Status != models.GameStatusFinished {
+			s.pauseTurnClock()
+			s.Status = models.GameStatusPaused
 			if leave {
 				for other := range s.Players {
 					if other != id {
@@ -124,7 +131,7 @@ func (s *GameSession) Disconnect(conn *realtime.WSConnection, leave bool) {
 						break
 					}
 				}
-				s.Status = "finished"
+				s.Status = models.GameStatusFinished
 				s.CurrentTurn = nil
 				s.CurrentUnitID = ""
 			}

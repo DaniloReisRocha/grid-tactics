@@ -1,5 +1,7 @@
 export type Position = { x: number; y: number };
 import type { MapTile } from "@/components/ProceduralMap/generator";
+import type { GameStatus } from "./status";
+export type { GameStatus } from "./status";
 
 export type Cell = MapTile;
 export type Effect = {
@@ -38,8 +40,8 @@ export type UnitInstance = Position & {
   movementMode?: "jump" | "";
 };
 export type Player = { name: string; accoID: string; connected: boolean; units: UnitInstance[] };
-export type GameStatus = "waiting" | "playing" | "paused" | "finished";
 export type GameStatePayload = {
+  serverTimeMS: number; turnDeadlineMS: number; turnRemainingMS: number;
   orbs: (Position & { id: string; triggered: boolean; collectedBy?: string })[];
   currentUnitID: string; roundCounter: number; roundTurn: number;
   roundOrder: { playerID: string; unitID: string }[];

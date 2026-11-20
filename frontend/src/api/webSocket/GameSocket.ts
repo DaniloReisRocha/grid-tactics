@@ -1,5 +1,7 @@
 import type { GameStatePayload } from "@/api/models";
 import type { UnitLoadout } from "@/api/team";
+import { ConnectionStatus } from "../status";
+export { ConnectionStatus } from "../status";
 
 export const MessageType = {
   echo: "echo", joinGame: "joinGame", movePiece: "movePiece",
@@ -8,7 +10,6 @@ export const MessageType = {
   useAbility: "useAbility",
 } as const;
 
-export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "reconnecting";
 export type ServerMessage =
   | { type: "gameStateUpdate"; payload: GameStatePayload }
   | { type: "actionFailed"; payload: { action: string; message: string } }
@@ -40,13 +41,13 @@ class GameConnection {
   }
   private open() {
     if (!this.desired) return;
-    this.status(this.attempts ? "reconnecting" : "connecting");
+    this.status(this.attempts ? ConnectionStatus.reconnecting : ConnectionStatus.connecting);
     const socket = new WebSocket(import.meta.env.VITE_WS_URL);
     this.socket = socket;
     socket.onopen = () => {
       if (this.socket !== socket || !this.desired) return;
       this.attempts = 0;
-      this.status("connected");
+      this.status(ConnectionStatus.connected);
       this.sendAction(MessageType.joinGame, this.desired);
     };
     socket.onmessage = (event) => {
@@ -62,12 +63,12 @@ class GameConnection {
       this.socket = null;
       if (event.code === 4001) {
         this.desired = null;
-        this.status("disconnected");
+        this.status(ConnectionStatus.disconnected);
         this.notifyError("Esta conta entrou em outra conexão. Volte ao início para entrar novamente.");
         return;
       }
-      if (!this.desired) { this.status("disconnected"); return; }
-      this.status("reconnecting");
+      if (!this.desired) { this.status(ConnectionStatus.disconnected); return; }
+      this.status(ConnectionStatus.reconnecting);
       const delay = Math.min(10000, 500 * 2 ** this.attempts++);
       this.retry = setTimeout(() => this.open(), delay);
     };
@@ -88,7 +89,7 @@ class GameConnection {
     this.socket = null;
     socket?.close();
     this.attempts = 0;
-    this.status("disconnected");
+    this.status(ConnectionStatus.disconnected);
   }
 }
 

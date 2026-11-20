@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Application, extend } from "@pixi/react";
 import { Assets, Container, Graphics, Polygon, Sprite, type FederatedPointerEvent, type Texture } from "pixi.js";
 import Minimap from "./Minimap";
@@ -42,6 +42,7 @@ export interface ProceduralMapProps {
   className?: string;
   /** The parent must provide a height, or set one here (for example, 600). */
   style?: CSSProperties;
+  topLeftOverlay?: ReactNode;
 }
 
 type TextureMap = Record<Asset, Texture>;
@@ -57,6 +58,7 @@ export default function ProceduralMap({
   showMinimap = true,
   className,
   style,
+  topLeftOverlay,
 }: ProceduralMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const structures = useRef(new Map<string, OccludingStructure>());
@@ -288,6 +290,8 @@ export default function ProceduralMap({
       </Application>
       ) : null}
 
+      {topLeftOverlay ? <div style={styles.topLeftOverlay}>{topLeftOverlay}</div> : null}
+
       {showMinimap ? (
         <Minimap tiles={tiles} width={width} height={height} actors={actors} reversed={reversed} />
       ) : null}
@@ -332,6 +336,12 @@ export default function ProceduralMap({
 }
 
 const styles: Record<string, CSSProperties> = {
+  topLeftOverlay: {
+    position: "absolute", top: 16, left: 16, zIndex: 2,
+    padding: "10px 14px", borderRadius: 10,
+    border: "1px solid rgba(224, 237, 198, 0.3)",
+    background: "rgba(19, 31, 27, 0.94)", pointerEvents: "none",
+  },
   rotateButton: {
     position: "absolute", top: 16, right: 16, padding: "8px 12px",
     border: "1px solid rgba(224, 237, 198, 0.3)", borderRadius: 8,

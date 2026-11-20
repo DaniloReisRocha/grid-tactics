@@ -18,6 +18,7 @@ func startedSession(t *testing.T) (*GameSession, uuid.UUID, uuid.UUID) {
 	a := uuid.Must(uuid.NewV4())
 	b := uuid.Must(uuid.NewV4())
 	s := NewGameSession("test", 2)
+	t.Cleanup(s.Close)
 	if err := s.AddPlayer(nil, a, []models.Unit{testUnit("a")}); err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +150,7 @@ func TestAttackShieldLifeVictoryAndFriendlyFire(t *testing.T) {
 	if err := s.Attack(a, "a", models.Position{X: 1}); err != nil {
 		t.Fatal(err)
 	}
-	if s.Status != "finished" || s.Winner == nil || *s.Winner != a || s.CurrentTurn != nil {
+	if s.Status != models.GameStatusFinished || s.Winner == nil || *s.Winner != a || s.CurrentTurn != nil {
 		t.Fatal("victory not recorded")
 	}
 	if err := s.EndTurn(a); err == nil {

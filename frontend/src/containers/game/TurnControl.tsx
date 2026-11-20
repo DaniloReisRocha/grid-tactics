@@ -1,8 +1,11 @@
+import { GameStatus, ConnectionStatus } from "@/api/status";
 import { useGameSocket } from "@/store/GameSocket";
+import { useTurnSeconds } from "./useTurnSeconds";
 
 export const TurnControl = () => {
   const { currentTurn, currentUnitID, roundCounter, roundTurn, roundOrder, players,
     accountID, endTurn, pending, status, connection, setUnit } = useGameSocket();
+  const seconds = useTurnSeconds();
   const player = currentTurn ? players[currentTurn] : undefined;
   const active = player?.units.find((unit) => unit.unit.id === currentUnitID);
   const yourTurn = currentTurn === accountID;
@@ -12,7 +15,7 @@ export const TurnControl = () => {
       <p>{player?.name ?? "—"} · {active?.unit.icon} Unidade {player ? player.units.findIndex((unit) => unit.unit.id === currentUnitID) + 1 : "—"}</p>
       <p>{yourTurn ? "É a vez desta unidade sua." : "Aguarde sua vez."}</p>
       <button type="button" onClick={endTurn}
-        disabled={!yourTurn || pending || status !== "playing" || connection !== "connected"}>
+        disabled={!yourTurn || pending || status !== GameStatus.playing || connection !== ConnectionStatus.connected || seconds === 0}>
         Finalizar turno da unidade
       </button>
       <ol aria-label="Sequência do round" style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: 0, listStyle: "none" }}>

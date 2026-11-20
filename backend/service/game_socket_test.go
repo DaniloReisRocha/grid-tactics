@@ -16,7 +16,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-func readState(t *testing.T, conn *websocket.Conn, status string) models.GameStatePayload {
+func readState(t *testing.T, conn *websocket.Conn, status models.GameStatus) models.GameStatePayload {
 	t.Helper()
 	_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 	for {
@@ -72,12 +72,15 @@ func TestTwoClientsMoveTurnReconnectReplaceAndLeave(t *testing.T) {
 	defer one.Close()
 	defer two.Close()
 	join(one, a)
-	readState(t, one, "waiting")
+	readState(t, one, models.GameStatusWaiting)
 	join(two, b)
-	state := readState(t, one, "playing")
-	readState(t, two, "playing")
+	state := readState(t, one, models.GameStatusPlaying)
+	readState(t, two, models.GameStatusPlaying)
 	if state.CurrentTurn == nil || state.CurrentUnitID == "" || state.RoundCounter != 1 || len(state.RoundOrder) != 6 {
 		t.Fatal("missing initial round")
+	}
+	if state.TurnDeadlineMS <= state.ServerTimeMS || state.TurnDeadlineMS-state.ServerTimeMS > 45000 || state.TurnRemainingMS <= 0 {
+		t.Fatal("initial turn deadline was not sent over websocket")
 	}
 	if *state.CurrentTurn == b {
 		a, b = b, a
@@ -121,8 +124,8 @@ func TestTwoClientsMoveTurnReconnectReplaceAndLeave(t *testing.T) {
 		t.Fatal("no neighbor for test movement")
 	}
 	sendAction(t, one, movePiece, movePieceAction{UnitID: unit.Unit.ID, To: target})
-	state = readState(t, one, "playing")
-	other := readState(t, two, "playing")
+	state = readState(t, one, models.GameStatusPlaying)
+	other := readState(t, two, models.GameStatusPlaying)
 	findUnit := func(state models.GameStatePayload) models.UnitInstance {
 		for _, candidate := range state.Players[a].Units {
 			if candidate.Unit.ID == unit.Unit.ID {
@@ -135,9 +138,12 @@ func TestTwoClientsMoveTurnReconnectReplaceAndLeave(t *testing.T) {
 	if findUnit(state).Position != target || other.Revision != state.Revision || len(findUnit(state).Path) < 2 {
 		t.Fatal("movement not synchronized")
 	}
+	if state.TurnDeadlineMS != other.TurnDeadlineMS {
+		t.Fatal("clients received different turn deadlines")
+	}
 	sendAction(t, one, endTurn, struct{}{})
-	state = readState(t, one, "playing")
-	readState(t, two, "playing")
+	state = readState(t, one, models.GameStatusPlaying)
+	readState(t, two, models.GameStatusPlaying)
 	if *state.CurrentTurn != b || state.TurnCounter != 2 {
 		t.Fatal("turn not synchronized")
 	}
@@ -156,12 +162,12 @@ func TestTwoClientsMoveTurnReconnectReplaceAndLeave(t *testing.T) {
 		t.Fatal("incorrect error action")
 	}
 	two.Close()
-	readState(t, one, "paused")
+	readState(t, one, models.GameStatusPaused)
 	two = dial()
 	defer two.Close()
 	join(two, b)
-	state = readState(t, one, "playing")
-	readState(t, two, "playing")
+	state = readState(t, one, models.GameStatusPlaying)
+	readState(t, two, models.GameStatusPlaying)
 	if state.TurnCounter != 2 || findUnit(state).Position != target {
 		t.Fatal("reconnect reset match")
 	}
@@ -171,15 +177,15 @@ func TestTwoClientsMoveTurnReconnectReplaceAndLeave(t *testing.T) {
 	replacement := dial()
 	defer replacement.Close()
 	join(replacement, b)
-	readState(t, one, "playing")
-	readState(t, replacement, "playing")
+	readState(t, one, models.GameStatusPlaying)
+	readState(t, replacement, models.GameStatusPlaying)
 	_ = two.SetReadDeadline(time.Now().Add(3 * time.Second))
 	_, _, err := two.ReadMessage()
 	if !websocket.IsCloseError(err, 4001) {
 		t.Fatalf("expected replacement close code, got %v", err)
 	}
 	sendAction(t, one, leaveGame, struct{}{})
-	state = readState(t, replacement, "finished")
+	state = readState(t, replacement, models.GameStatusFinished)
 	if state.Winner == nil || *state.Winner != b {
 		t.Fatal("forfeit did not end match")
 	}
@@ -286,14 +292,14 @@ func TestOrbSpawnCollectionAndReconnectAreSynchronized(t *testing.T) {
 	defer clients[a].Close()
 	defer clients[b].Close()
 	join(clients[a], a)
-	readState(t, clients[a], "playing")
+	readState(t, clients[a], models.GameStatusPlaying)
 	join(clients[b], b)
-	one, two := readState(t, clients[a], "playing"), readState(t, clients[b], "playing")
+	one, two := readState(t, clients[a], models.GameStatusPlaying), readState(t, clients[b], models.GameStatusPlaying)
 	if len(one.Orbs) != 1 || !reflect.DeepEqual(one.Orbs, two.Orbs) || one.Orbs[0].Triggered {
 		t.Fatal("spawn not synchronized")
 	}
 	sendAction(t, clients[owner], movePiece, movePieceAction{UnitID: actorID, To: orb.Position})
-	one, two = readState(t, clients[a], "playing"), readState(t, clients[b], "playing")
+	one, two = readState(t, clients[a], models.GameStatusPlaying), readState(t, clients[b], models.GameStatusPlaying)
 	if !reflect.DeepEqual(one.Orbs, two.Orbs) || !one.Orbs[0].Triggered || one.Orbs[0].CollectedBy != actorID {
 		t.Fatal("collection not synchronized")
 	}
@@ -309,12 +315,12 @@ func TestOrbSpawnCollectionAndReconnectAreSynchronized(t *testing.T) {
 		other = b
 	}
 	clients[owner].Close()
-	readState(t, clients[other], "paused")
+	readState(t, clients[other], models.GameStatusPaused)
 	reconnected := dial()
 	defer reconnected.Close()
 	join(reconnected, owner)
-	state := readState(t, reconnected, "playing")
-	readState(t, clients[other], "playing")
+	state := readState(t, reconnected, models.GameStatusPlaying)
+	readState(t, clients[other], models.GameStatusPlaying)
 	if !reflect.DeepEqual(state.Orbs, one.Orbs) {
 		t.Fatal("reconnect reset orb state")
 	}
@@ -339,10 +345,10 @@ func TestSelectedTeamAndPassivePersistOnWebSocketReconnect(t *testing.T) {
 	defer two.Close()
 	selection := testTeam()
 	sendAction(t, one, joinGame, joinGameAction{SessionID: "selected-team", AccoID: a.String(), Team: selection})
-	readState(t, one, "waiting")
+	readState(t, one, models.GameStatusWaiting)
 	sendAction(t, two, joinGame, joinGameAction{SessionID: "selected-team", AccoID: b.String()})
-	state := readState(t, one, "playing")
-	readState(t, two, "playing")
+	state := readState(t, one, models.GameStatusPlaying)
+	readState(t, two, models.GameStatusPlaying)
 	for i, unit := range state.Players[a].Units {
 		if unit.Unit.Weapons[0].ID != selection[i].WeaponID || len(unit.Unit.Abilities) != len(selection[i].AbilityIDs) || unit.CurrentStamina != unit.Unit.EffectiveStamina() {
 			t.Fatal("selected equipment did not reach the game")
@@ -355,8 +361,8 @@ func TestSelectedTeamAndPassivePersistOnWebSocketReconnect(t *testing.T) {
 			conn = two
 		}
 		sendAction(t, conn, endTurn, struct{}{})
-		state = readState(t, one, "playing")
-		readState(t, two, "playing")
+		state = readState(t, one, models.GameStatusPlaying)
+		readState(t, two, models.GameStatusPlaying)
 	}
 	if state.CurrentUnitID != unit.Unit.ID {
 		t.Fatal("equipped unit never received its turn")
@@ -372,14 +378,14 @@ func TestSelectedTeamAndPassivePersistOnWebSocketReconnect(t *testing.T) {
 		t.Fatal("equipped passive was not applied at spawn")
 	}
 	one.Close()
-	readState(t, two, "paused")
+	readState(t, two, models.GameStatusPaused)
 	reconnected := dial()
 	defer reconnected.Close()
 	// An attempted equipment change during rejoin must preserve the confirmed roster.
 	selection[0].WeaponID = models.WeaponKatanaID
 	sendAction(t, reconnected, joinGame, joinGameAction{SessionID: "selected-team", AccoID: a.String(), Team: selection})
-	state = readState(t, reconnected, "playing")
-	readState(t, two, "playing")
+	state = readState(t, reconnected, models.GameStatusPlaying)
+	readState(t, two, models.GameStatusPlaying)
 	unit = state.Players[a].Units[0]
 	if unit.Unit.Weapons[0].ID != models.WeaponPistolID || unit.CurrentShield != 3 || unit.AbilityUses[models.AbilityShieldID] != 0 {
 		t.Fatal("reconnection changed loadout or restored consumed skill")

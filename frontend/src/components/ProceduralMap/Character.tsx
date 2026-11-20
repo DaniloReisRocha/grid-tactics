@@ -4,7 +4,7 @@ import { Assets, Rectangle, Sprite, Texture } from "pixi.js";
 import sheetUrl from "@/assets/Small-8-Direction-Characters_by_AxulArt/Small-8-Direction-Characters_by_AxulArt.png";
 import { LEVEL_HEIGHT, hasBridge, type MapTile } from "./generator";
 import type { CharacterModel } from "./types";
-import ActiveTurnArrow from "./ActiveTurnArrow";
+import UnitArrow from "./UnitArrow";
 import { projectPosition, viewDepth, type MapView } from "./projection";
 
 interface CharacterProps {
@@ -19,6 +19,7 @@ interface CharacterProps {
   onElevation?: (height: number) => void;
   jump?: boolean;
   activeTurn?: boolean;
+  selected?: boolean;
   onTileEnter?: (tile: MapTile) => void;
 }
 
@@ -39,7 +40,7 @@ function project(tile: MapTile, view: MapView) {
   };
 }
 
-export default function Character({ spawn, path, view, onError, model = 2, onSelect, onHover, onSprite, onElevation, jump = false, activeTurn = false, onTileEnter }: CharacterProps) {
+export default function Character({ spawn, path, view, onError, model = 2, onSelect, onHover, onSprite, onElevation, jump = false, activeTurn = false, selected = false, onTileEnter }: CharacterProps) {
   const spriteRef = useRef<Sprite>(null);
   const registerSprite = useCallback((sprite: Sprite | null) => {
     spriteRef.current = sprite;
@@ -137,7 +138,8 @@ export default function Character({ spawn, path, view, onError, model = 2, onSel
       onPointerOver={() => onHover?.(true)}
       onPointerOut={() => onHover?.(false)}
     />
-    {activeTurn ? <ActiveTurnArrow character={spriteRef} onError={onError} /> : null}
+    {activeTurn || selected ? <UnitArrow key={activeTurn ? "turn" : "selection"}
+      character={spriteRef} onError={onError} variant={activeTurn ? "turn" : "selection"} /> : null}
     </>
   ) : null;
 }

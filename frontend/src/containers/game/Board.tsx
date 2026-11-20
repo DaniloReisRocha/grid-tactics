@@ -1,3 +1,4 @@
+import { GameStatus, ConnectionStatus } from "@/api/status";
 import { useMemo, useState } from "react";
 import ProceduralMap from "@/components/ProceduralMap";
 import type { MapTile } from "@/components/ProceduralMap/generator";
@@ -9,6 +10,7 @@ import { canUnitAttack, isAttackTarget, isBarricadeTarget } from "@/internal/gam
 import { labAbilityProblem,combatSkillToken,abilityArea } from "@/internal/game/abilities";
 import { useGameOrbs } from "./useGameOrbs";
 import { EffectID } from "@/internal/game/effects";
+import TurnTimer from "./TurnTimer";
 
 export const Board = () => {
   const { id, board, players, orbs, turnOrder, unitID, setUnit, movePiece, attackPiece, attackMode,
@@ -23,7 +25,7 @@ export const Board = () => {
   const activeSkill=selected?.unit.abilities?.find((item)=>item.id===skillMode);
   const canAct = Boolean(selected && selected.ownerID === accountID && selected.currentLife > 0
     && selected.unit.id === currentUnitID
-    && currentTurn === accountID && status === "playing" && connection === "connected" && !pending);
+    && currentTurn === accountID && status === GameStatus.playing && connection === ConnectionStatus.connected && !pending);
   const options = useMemo(() => selected && canAct && !skillMode ? movementOptions(board, selected, units) : null, [board, selected, units, canAct,skillMode]);
   const living = useMemo(() => new Map(units.filter((unit) => unit.currentLife > 0).map((unit) => [positionKey(unit), unit])), [units]);
   const attackTargets = new Set<string>();
@@ -69,6 +71,7 @@ export const Board = () => {
       width={width} height={height}
       tiles={board} actors={actors}
       orbs={orbView.orbs} onOrbComplete={orbView.onOrbComplete}
+      topLeftOverlay={<TurnTimer />}
       style={{ flex: "1 1 650px", minWidth: 0, height: "max(540px, calc(100vh - 140px))", borderRadius: 12 }}
       interaction={{
         path: previewPath, selectable, attackTargets,

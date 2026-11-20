@@ -95,7 +95,7 @@ func (s *GameSession) Attack(id uuid.UUID, unitID string, target models.Position
 			if !alive {
 				winner := id
 				s.Winner = &winner
-				s.Status = "finished"
+				s.Status = models.GameStatusFinished
 				s.CurrentTurn = nil
 				s.CurrentUnitID = ""
 			}

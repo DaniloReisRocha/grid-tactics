@@ -21,6 +21,11 @@ type PlayerState struct {
 }
 
 type GameSession struct {
+	TurnDeadline     time.Time
+	turnRemaining    time.Duration
+	turnTimer        *time.Timer
+	clockGeneration  uint64
+	closed           bool
 	Orbs             []models.Orb
 	RoundOrder       []models.UnitTurn
 	RoundCounter     int
@@ -34,7 +39,7 @@ type GameSession struct {
 	TurnOrder        []uuid.UUID
 	CurrentTurn      *uuid.UUID
 	TurnCounter      int
-	Status           string
+	Status           models.GameStatus
 	Winner           *uuid.UUID
 	Revision         uint64
 	MatchAbilityUses map[string]int
@@ -46,7 +51,7 @@ type GameSession struct {
 func NewGameSession(id string, maximumPlayers int) *GameSession {
 	return &GameSession{
 		ID: id, maximumPlayers: maximumPlayers, Players: make(map[uuid.UUID]*PlayerState),
-		Board: generateBoard(id, 15, 15), TurnOrder: []uuid.UUID{}, Status: "waiting",
+		Board: generateBoard(id, 15, 15), TurnOrder: []uuid.UUID{}, Status: models.GameStatusWaiting,
 		MatchAbilityUses: map[string]int{},
 		StartedAt:        time.Now(), LastAction: time.Now(), lock: &sync.RWMutex{},
 	}
@@ -59,7 +64,13 @@ func (s *GameSession) HasPlayer(id uuid.UUID) bool {
 	return exists
 }
 
-func (s *GameSession) changed() { s.Revision++; s.LastAction = time.Now() }
+func (s *GameSession) changed() {
+	if s.Status == models.GameStatusFinished || s.Status == models.GameStatusWaiting {
+		s.clearTurnClock()
+	}
+	s.Revision++
+	s.LastAction = time.Now()
+}
 
 // Snapshot under the session lock; serialize/send outside it so clients cannot block gameplay.
 func (s *GameSession) BroadcastState() error {
@@ -87,6 +98,7 @@ func (s *GameSession) BroadcastState() error {
 		winner = &id
 	}
 	payload := models.GameStatePayload{
+		ServerTimeMS: time.Now().UnixMilli(), TurnRemainingMS: s.turnRemaining.Milliseconds(),
 		Orbs:       append([]models.Orb{}, s.Orbs...),
 		RoundOrder: append([]models.UnitTurn{}, s.RoundOrder...), RoundCounter: s.RoundCounter,
 		RoundTurn: s.RoundTurn, CurrentUnitID: s.CurrentUnitID,
@@ -94,6 +106,10 @@ func (s *GameSession) BroadcastState() error {
 		TurnOrder: append([]uuid.UUID{}, s.TurnOrder...), CurrentTurn: turn,
 		TurnCounter: s.TurnCounter, Status: s.Status, Winner: winner, Revision: s.Revision,
 		MatchAbilityUses: maps.Clone(s.MatchAbilityUses),
+	}
+	if !s.TurnDeadline.IsZero() {
+		payload.TurnDeadlineMS = s.TurnDeadline.UnixMilli()
+		payload.TurnRemainingMS = max(0, time.Until(s.TurnDeadline).Milliseconds())
 	}
 	s.lock.RUnlock()
 	var failures []error
@@ -116,13 +132,14 @@ func (s *GameSession) AddPlayer(conn *realtime.WSConnection, id uuid.UUID, units
 		if previous != nil && previous != conn {
 			previous.Replace()
 		}
-		if s.Status == "paused" && s.allConnected() {
-			s.Status = "playing"
+		if s.Status == models.GameStatusPaused && s.allConnected() {
+			s.Status = models.GameStatusPlaying
+			s.startTurnClock(s.turnRemaining)
 		}
 		s.changed()
 		return nil
 	}
-	if s.Status != "waiting" || len(s.Players) >= s.maximumPlayers {
+	if s.Status != models.GameStatusWaiting || len(s.Players) >= s.maximumPlayers {
 		return errors.New("partida fechada")
 	}
 	if len(units) == 0 {
@@ -165,7 +182,7 @@ func (s *GameSession) AddPlayer(conn *realtime.WSConnection, id uuid.UUID, units
 		}
 	}
 	if len(s.Players) == s.maximumPlayers {
-		s.Status = "playing"
+		s.Status = models.GameStatusPlaying
 		s.startRound()
 		s.beginUnitTurn()
 	}
@@ -198,8 +215,11 @@ func (s *GameSession) occupied() map[models.Position]bool {
 }
 
 func (s *GameSession) actingPlayer(id uuid.UUID) (*PlayerState, error) {
-	if s.Status != "playing" {
+	if s.closed || s.Status != models.GameStatusPlaying {
 		return nil, errors.New("partida não está em andamento")
+	}
+	if !s.TurnDeadline.IsZero() && !time.Now().Before(s.TurnDeadline) {
+		return nil, errors.New("o tempo deste turno acabou")
 	}
 	if s.CurrentTurn == nil || *s.CurrentTurn != id {
 		return nil, errors.New("não é seu turno")

@@ -75,6 +75,20 @@ test("game orbs wait for their collector's arrival and stay hidden after reconne
   assert.equal(reconnect(collected).orbs.length,0);
 });
 
+test("turn countdown follows the server deadline, freezes when paused, and handles clock skew", () => {
+  const {turnSecondsLeft} = compile("internal/game/turnClock.ts");
+  assert.equal(turnSecondsLeft("playing",145000,45000,0,100000),45);
+  assert.equal(turnSecondsLeft("playing",145000,45000,0,99900),45);
+  assert.equal(turnSecondsLeft("playing",145000,45000,0,144001),1);
+  assert.equal(turnSecondsLeft("playing",145000,45000,0,145000),0);
+  assert.equal(turnSecondsLeft("playing",145000,45000,0,200000),0);
+  assert.equal(turnSecondsLeft("playing",145000,45000,100000,0),45);
+  assert.equal(turnSecondsLeft("paused",0,12500,0,900000),13);
+  assert.equal(turnSecondsLeft("paused",0,12500,0,990000),13);
+  assert.equal(turnSecondsLeft("finished",145000,45000,0,100000),0);
+  assert.equal(turnSecondsLeft("waiting",0,0,0,100000),0);
+});
+
 test("opposite camera reverses depth and projection on rectangular maps without mutating world coordinates", () => {
   const { viewPosition, projectPosition, viewDepth } = compile("components/ProceduralMap/projection.ts");
   const normal = { width: 9, height: 5, reversed: false };
@@ -441,6 +455,7 @@ test("empty slots do not send attacks, consume allowance or exit attack mode", (
   };
   const { gameStore } = compile("store/GameSocket.ts", { require: (specifier) => {
     if (specifier === "zustand") return require("zustand");
+    if (specifier === "@/api/status") return compile("api/status.ts");
     if (specifier === "@/api/webSocket/GameSocket") return {GameSocket:socket,MessageType:{attackPiece:"attackPiece"}};
     if (specifier === "@/internal/game/combat") return compile("internal/game/combat.ts");
     throw new Error(`Unexpected import ${specifier}`);
@@ -476,6 +491,7 @@ test("unit turns guard all actions and select the next active unit on server upd
   const types = { movePiece:"movePiece", attackPiece:"attackPiece", useAbility:"useAbility", endTurn:"endTurn" };
   const { gameStore } = compile("store/GameSocket.ts", { require: (specifier) => {
     if (specifier === "zustand") return require("zustand");
+    if (specifier === "@/api/status") return compile("api/status.ts");
     if (specifier === "@/api/webSocket/GameSocket") return { GameSocket:socket, MessageType:types };
     if (specifier === "@/internal/game/combat") return compile("internal/game/combat.ts");
     throw new Error(`Unexpected import ${specifier}`);

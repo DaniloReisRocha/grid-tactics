@@ -161,7 +161,7 @@ func TestGrenadeCrossesBothOrbMilestonesInOneAction(t *testing.T) {
 	if err := s.UseAbility(a, actor.Unit.ID, grenade.ID, models.Position{X: 6, Y: 5}); err != nil {
 		t.Fatal(err)
 	}
-	if s.Status != "playing" || len(s.Orbs) != 2 || s.Orbs[0].Position == s.Orbs[1].Position {
+	if s.Status != models.GameStatusPlaying || len(s.Orbs) != 2 || s.Orbs[0].Position == s.Orbs[1].Position {
 		t.Fatal("multi-kill skipped milestones")
 	}
 }

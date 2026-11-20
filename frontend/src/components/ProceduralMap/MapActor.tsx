@@ -42,6 +42,7 @@ export default function MapActor({ actor, view, onSelect, onHover, onError, onSe
           view={view}
           jump={actor.movementMode === "jump"}
           activeTurn={actor.activeTurn}
+          selected={actor.selected}
           onTileEnter={(tile) => onTileEnter?.(tile, actor.id)}
           spawn={initialTile.current} path={path} model={actor.model}
           onError={onError}

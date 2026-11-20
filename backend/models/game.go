@@ -56,6 +56,9 @@ type UnitTurn struct {
 }
 
 type GameStatePayload struct {
+	ServerTimeMS     int64                 `json:"serverTimeMS"`
+	TurnDeadlineMS   int64                 `json:"turnDeadlineMS"`
+	TurnRemainingMS  int64                 `json:"turnRemainingMS"`
 	Orbs             []Orb                 `json:"orbs"`
 	RoundOrder       []UnitTurn            `json:"roundOrder"`
 	RoundCounter     int                   `json:"roundCounter"`
@@ -67,7 +70,7 @@ type GameStatePayload struct {
 	TurnOrder        []uuid.UUID           `json:"turnOrder"`
 	CurrentTurn      *uuid.UUID            `json:"currentTurn"`
 	TurnCounter      int                   `json:"turnCounter"`
-	Status           string                `json:"status"`
+	Status           GameStatus            `json:"status"`
 	Winner           *uuid.UUID            `json:"winner"`
 	Revision         uint64                `json:"revision"`
 	MatchAbilityUses map[string]int        `json:"matchAbilityUses"`

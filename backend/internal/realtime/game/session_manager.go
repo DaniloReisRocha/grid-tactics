@@ -61,5 +61,8 @@ func (sm *SessionManager) RemoveSession(id string) {
 	sm.lock.Lock()
 	defer sm.lock.Unlock()
 
+	if session, ok := sm.sessions[id]; ok {
+		session.Close()
+	}
 	delete(sm.sessions, id)
 }

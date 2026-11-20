@@ -76,7 +76,7 @@ func (s *GameSession) UseAbility(id uuid.UUID, unitID, abilityID string, target 
 		}
 	}
 	if len(aliveTeams) < 2 {
-		s.Status = "finished"
+		s.Status = models.GameStatusFinished
 		s.CurrentTurn = nil
 		s.CurrentUnitID = ""
 		if len(aliveTeams) == 1 {
@@ -86,7 +86,7 @@ func (s *GameSession) UseAbility(id uuid.UUID, unitID, abilityID string, target 
 			s.Winner = nil
 		}
 	}
-	if s.Status == "playing" && actor.CurrentLife <= 0 {
+	if s.Status == models.GameStatusPlaying && actor.CurrentLife <= 0 {
 		s.advanceUnitTurn()
 	}
 	s.spawnMilestoneOrbs()

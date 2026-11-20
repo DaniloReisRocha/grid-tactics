@@ -1,17 +1,20 @@
+import { GameStatus, ConnectionStatus } from "@/api/status";
 import { create } from "zustand";
 import type { GameStatePayload } from "@/api/models";
 import type { UnitLoadout } from "@/api/team";
-import { GameSocket, MessageType, type ConnectionStatus } from "@/api/webSocket/GameSocket";
+import { GameSocket, MessageType } from "@/api/webSocket/GameSocket";
 import { canUnitAttack, isAttackTarget, isBarricadeTarget } from "@/internal/game/combat";
 
 const emptyGame: GameStatePayload = {
+  serverTimeMS: 0, turnDeadlineMS: 0, turnRemainingMS: 0,
   orbs: [],
   currentUnitID: "", roundCounter: 0, roundTurn: 0, roundOrder: [],
   id: "", players: {}, board: [], turnOrder: [], currentTurn: null,
-  turnCounter: 0, status: "waiting", winner: null, revision: -1,
+  turnCounter: 0, status: GameStatus.waiting, winner: null, revision: -1,
   matchAbilityUses: {},
 };
 type GameStore = GameStatePayload & {
+  serverClockOffsetMS: number;
   accountID: string; unitID: string | null; attackMode: boolean;
   skillMode: string | null;
   setSkillMode: (id: string | null) => void;
@@ -30,14 +33,15 @@ type GameStore = GameStatePayload & {
 export const gameStore = create<GameStore>((set, get) => {
   const act = (type: string, payload: unknown = {}) => {
     const state = get();
-    if (state.pending || state.status !== "playing" || state.currentTurn !== state.accountID) return;
+    if (state.pending || state.status !== GameStatus.playing || state.currentTurn !== state.accountID) return;
     if (type !== MessageType.endTurn && (payload as { unitID?: string }).unitID !== state.currentUnitID) return;
     if (!GameSocket.sendAction(type, payload)) { set({ error: "Aguarde a conexão com o servidor." }); return; }
     set({ pending: true, error: null });
   };
   return {
     ...emptyGame, accountID: "", unitID: null, attackMode: false, skillMode: null,
-    connection: "disconnected", error: null, pending: false,
+    serverClockOffsetMS: 0,
+    connection: ConnectionStatus.disconnected, error: null, pending: false,
     setUnit: (unitID) => set({ unitID, attackMode: false, skillMode: null }),
     setAttackMode: (attackMode) => set({ attackMode, skillMode: null }),
     setSkillMode: (skillMode) => set({ skillMode, attackMode: false }),
@@ -63,11 +67,11 @@ export const gameStore = create<GameStore>((set, get) => {
       if (!attacker || (!isAttackTarget(attacker,target,state.board) && !(tile&&isBarricadeTarget(attacker,tile,state.board)))) return;
       act(MessageType.attackPiece, { unitID, to: { x, y } });
     },
-    endTurn: () => act(MessageType.endTurn),
+    endTurn: () => act(MessageType.endTurn, {turnCounter: get().turnCounter}),
   };
 });
 
-GameSocket.onStatus((connection) => gameStore.setState({ connection, ...(connection !== "connected" ? { pending: false } : {}) }));
+GameSocket.onStatus((connection) => gameStore.setState({ connection, ...(connection !== ConnectionStatus.connected ? { pending: false } : {}) }));
 GameSocket.subscribe((message) => {
   const state = gameStore.getState();
   if (message.type === "actionFailed") {
@@ -79,10 +83,11 @@ GameSocket.subscribe((message) => {
       .find((unit) => unit.unit.id === state.unitID && unit.currentLife > 0);
     gameStore.setState({
       ...payload, pending: false, error: null,
+      serverClockOffsetMS: payload.serverTimeMS ? payload.serverTimeMS - Date.now() : 0,
       skillMode: null,
       board: JSON.stringify(payload.board) === JSON.stringify(state.board) ? state.board : payload.board,
       unitID: payload.currentUnitID !== state.currentUnitID ? payload.currentUnitID || null : selected ? state.unitID : null,
-      attackMode: state.attackMode && payload.currentTurn === state.accountID && payload.status === "playing"
+      attackMode: state.attackMode && payload.currentTurn === state.accountID && payload.status === GameStatus.playing
         && payload.currentUnitID === state.currentUnitID && selected?.unit.id === payload.currentUnitID
         && Boolean(selected && canUnitAttack(selected)),
     });

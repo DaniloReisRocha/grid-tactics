@@ -79,9 +79,14 @@ func (gs *GameWsService) Receive(w http.ResponseWriter, r *http.Request) {
 				return session.UseAbility(conn.AccoID, payload.UnitID, payload.AbilityID, payload.To)
 			})
 		}),
-		endTurn: receiveAction(func(conn *realtime.WSConnection, _ struct{}) error {
-			return gs.inSession(conn, func(session *game.GameSession) error { return session.EndTurn(conn.AccoID) })
-		}),
+		endTurn: receiveAction(func(conn *realtime.WSConnection, payload struct {
+			TurnCounter *int `json:"turnCounter"`
+		}) error { return gs.inSession(conn, func(session *game.GameSession) error {
+			if payload.TurnCounter != nil {
+				return session.EndTurn(conn.AccoID, *payload.TurnCounter)
+			}
+			return session.EndTurn(conn.AccoID)
+		}) }),
 		leaveGame: receiveAction(func(conn *realtime.WSConnection, _ struct{}) error {
 			if session := gs.sessions().FindSessionByConn(conn); session != nil {
 				session.Disconnect(conn, true)

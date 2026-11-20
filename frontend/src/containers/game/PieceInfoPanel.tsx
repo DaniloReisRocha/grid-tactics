@@ -1,3 +1,4 @@
+import { GameStatus, ConnectionStatus } from "@/api/status";
 import { useGameSocket } from "@/store/GameSocket";
 import { canUnitAttack } from "@/internal/game/combat";
 import { effectiveStamina } from "@/internal/game/stamina";
@@ -26,9 +27,9 @@ export const PieceInfoPanel = () => {
     selected?.ownerID === accountID &&
     selected?.unit.id === currentUnitID && selected.currentLife > 0 &&
     currentTurn === accountID &&
-    status === "playing" &&
+    status === GameStatus.playing &&
     !pending &&
-    connection === "connected";
+    connection === ConnectionStatus.connected;
   const weapon = selected?.unit.weapons[0];
   const reloading = weaponReloading(weapon, selected?.turnCount);
   const tokens=units.map(combatSkillToken);

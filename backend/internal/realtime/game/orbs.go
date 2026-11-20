@@ -9,7 +9,7 @@ import (
 
 // Called under the session lock, after resolving all damage from one action.
 func (s *GameSession) spawnMilestoneOrbs() {
-	if s.Status != "playing" || len(s.Orbs) >= 2 {
+	if s.Status != models.GameStatusPlaying || len(s.Orbs) >= 2 {
 		return
 	}
 	total, alive := 0, 0
