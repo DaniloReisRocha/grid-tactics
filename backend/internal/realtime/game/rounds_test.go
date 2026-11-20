@@ -99,7 +99,7 @@ func TestOnlyActiveUnitCanMoveAttackOrUseAbilities(t *testing.T) {
 	}
 }
 
-func TestDeadUnitsSkippedAndUnequalTeamsFinishTheirRound(t *testing.T) {
+func TestDeadNextUnitReplacedByAnotherOpponent(t *testing.T) {
 	s, a, b := roundSession(t)
 	s.RoundOrder = []models.UnitTurn{
 		{PlayerID: a, UnitID: "0-0"}, {PlayerID: b, UnitID: "1-0"},
@@ -109,44 +109,22 @@ func TestDeadUnitsSkippedAndUnequalTeamsFinishTheirRound(t *testing.T) {
 	s.RoundTurn = 0
 	s.beginUnitTurn()
 	s.Players[b].Units[0].CurrentLife = 0
-	if err := s.EndTurn(a); err != nil {
-		t.Fatal(err)
-	}
-	order := append([]models.UnitTurn(nil), s.RoundOrder...)
-	if s.CurrentUnitID != "0-1" || s.RoundTurn != 2 {
-		t.Fatal("dead unit not skipped in the original sequence")
-	}
 	s.Players[b].Units[2].CurrentLife = 0
-	if err := s.EndTurn(a); err != nil {
-		t.Fatal(err)
+	s.changed()
+	if s.RoundOrder[1].UnitID != "1-1" || s.CurrentUnitID != "0-0" {
+		t.Fatal("upcoming order was not recalculated immediately after elimination")
 	}
-	if s.CurrentUnitID != "1-1" {
-		t.Fatal("remaining unit lost its turn")
-	}
-	if err := s.EndTurn(b); err != nil {
-		t.Fatal(err)
-	}
-	if s.CurrentUnitID != "0-2" {
-		t.Fatal("last ally lost its turn")
-	}
-	if err := s.EndTurn(a); err != nil {
-		t.Fatal(err)
-	}
-	if s.RoundCounter != 2 || !reflect.DeepEqual(order, s.RoundOrder) {
-		t.Fatal("new round changed the match sequence")
-	}
-	seen := map[string]bool{}
-	for i := 0; i < 4; i++ {
-		if seen[s.CurrentUnitID] {
-			t.Fatal("duplicate turn in unequal round")
-		}
-		seen[s.CurrentUnitID] = true
-		if err := s.EndTurn(*s.CurrentTurn); err != nil {
+	for _, expected := range []string{"1-1", "0-1", "1-1", "0-2", "1-1"} {
+		previous := *s.CurrentTurn
+		if err := s.EndTurn(previous); err != nil {
 			t.Fatal(err)
 		}
+		if *s.CurrentTurn == previous || s.CurrentUnitID != expected {
+			t.Fatalf("expected %s, got %s", expected, s.CurrentUnitID)
+		}
 	}
-	if s.RoundCounter != 3 {
-		t.Fatal("unequal round failed to complete")
+	if s.RoundCounter != 2 {
+		t.Fatal("round did not advance after every living unit played")
 	}
 }
 
@@ -167,23 +145,54 @@ func TestGrenadeSelfEliminationAdvancesActiveUnit(t *testing.T) {
 	}
 }
 
-func TestFixedOrderSkipsDeadFirstAndLastSlotsAcrossRounds(t *testing.T) {
-	s, _, _ := roundSession(t)
-	order := append([]models.UnitTurn(nil), s.RoundOrder...)
-	s.turnUnit(order[0]).CurrentLife = 0
-	s.turnUnit(order[len(order)-1]).CurrentLife = 0
-	s.advanceUnitTurn()
-	for round := 1; round <= 3; round++ {
-		for index := 1; index < len(order)-1; index++ {
-			if s.RoundCounter != round || s.RoundTurn != index || s.CurrentUnitID != order[index].UnitID || *s.CurrentTurn != order[index].PlayerID {
-				t.Fatal("dead boundary slots changed the surviving sequence")
-			}
-			if err := s.EndTurn(*s.CurrentTurn); err != nil {
-				t.Fatal(err)
-			}
-		}
-		if !reflect.DeepEqual(order, s.RoundOrder) {
-			t.Fatal("boundary deaths reordered the match")
+func TestEverySurvivingTeamConfigurationAlwaysAlternates(t *testing.T) {
+	// Every nonempty subset of both three-unit teams, including dead first/last
+	// slots and the active unit dying before advance.
+	for maskA := 1; maskA < 8; maskA++ {
+		for maskB := 1; maskB < 8; maskB++ {
+			t.Run(fmt.Sprintf("%d-%d", maskA, maskB), func(t *testing.T) {
+				s, a, b := roundSession(t)
+				for _, team := range []struct {
+					owner uuid.UUID
+					mask  int
+				}{{a, maskA}, {b, maskB}} {
+					for i := range s.Players[team.owner].Units {
+						if team.mask&(1<<i) == 0 {
+							s.Players[team.owner].Units[i].CurrentLife = 0
+						}
+					}
+				}
+				s.advanceUnitTurn()
+				seen := map[string]bool{}
+				round := s.RoundCounter
+				// Begin checking complete rounds, after finishing the partial first one.
+				for i := 0; i < 80; i++ {
+					if s.turnUnit(models.UnitTurn{PlayerID: *s.CurrentTurn, UnitID: s.CurrentUnitID}) == nil {
+						t.Fatal("dead unit scheduled")
+					}
+					seen[s.CurrentUnitID] = true
+					previous := *s.CurrentTurn
+					if err := s.EndTurn(previous); err != nil {
+						t.Fatal(err)
+					}
+					if *s.CurrentTurn == previous {
+						t.Fatal("same player received consecutive turns")
+					}
+					if s.RoundCounter != round {
+						if round > 1 {
+							for _, p := range s.Players {
+								for _, u := range p.Units {
+									if u.CurrentLife > 0 && !seen[u.Unit.ID] {
+										t.Fatal("living unit starved")
+									}
+								}
+							}
+						}
+						round = s.RoundCounter
+						seen = map[string]bool{}
+					}
+				}
+			})
 		}
 	}
 }

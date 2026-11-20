@@ -24,43 +24,106 @@ func (s *GameSession) EndTurn(id uuid.UUID, expectedTurn ...int) error {
 	return nil
 }
 
-// Shuffle and interleave once per match. Later rounds reuse the same order,
-// keeping eliminated units in their slots and skipping them when advancing.
+// Preserve randomized unit priority, but always alternate players, including
+// across rounds. A smaller team repeats units until every living unit has acted.
 func (s *GameSession) startRound() {
-	if len(s.RoundOrder) > 0 {
-		s.RoundCounter++
-		s.RoundTurn = 0
-		for s.RoundTurn < len(s.RoundOrder) && s.turnUnit(s.RoundOrder[s.RoundTurn]) == nil {
-			s.RoundTurn++
-		}
-		return
-	}
-	queues := make([][]models.UnitTurn, len(s.TurnOrder))
-	remaining := 0
-	for i, id := range s.TurnOrder {
-		for _, unit := range s.Players[id].Units {
-			if unit.CurrentLife > 0 {
-				queues[i] = append(queues[i], models.UnitTurn{PlayerID: id, UnitID: unit.Unit.ID})
-				remaining++
+	if len(s.RoundOrder) == 0 {
+		for _, id := range s.TurnOrder {
+			queue := []models.UnitTurn{}
+			for _, unit := range s.Players[id].Units {
+				queue = append(queue, models.UnitTurn{PlayerID: id, UnitID: unit.Unit.ID})
 			}
+			rand.Shuffle(len(queue), func(a, b int) { queue[a], queue[b] = queue[b], queue[a] })
+			s.RoundOrder = append(s.RoundOrder, queue...)
 		}
-		rand.Shuffle(len(queues[i]), func(a, b int) { queues[i][a], queues[i][b] = queues[i][b], queues[i][a] })
 	}
-	s.RoundOrder = []models.UnitTurn{}
-	if remaining == 0 {
-		return
+	previous := s.CurrentTurn
+	if s.RoundCounter == 0 {
+		previous = nil
 	}
-	next := rand.Intn(len(queues))
-	for remaining > 0 {
-		if len(queues[next]) > 0 {
-			s.RoundOrder = append(s.RoundOrder, queues[next][0])
-			queues[next] = queues[next][1:]
-			remaining--
-		}
-		next = (next + 1) % len(queues)
-	}
+	s.RoundOrder = s.scheduleTurns(nil, previous)
 	s.RoundCounter++
 	s.RoundTurn = 0
+}
+
+// Caller holds the session lock. Executed slots are immutable; only future
+// slots are rebuilt after eliminations, with priority for units not yet played.
+func (s *GameSession) scheduleTurns(played []models.UnitTurn, previous *uuid.UUID) []models.UnitTurn {
+	queues := make(map[uuid.UUID][]models.UnitTurn)
+	seen := make(map[models.UnitTurn]bool)
+	for _, turn := range s.RoundOrder {
+		if !seen[turn] && s.turnUnit(turn) != nil {
+			queues[turn.PlayerID] = append(queues[turn.PlayerID], turn)
+			seen[turn] = true
+		}
+	}
+	for _, id := range s.TurnOrder {
+		for _, unit := range s.Players[id].Units {
+			turn := models.UnitTurn{PlayerID: id, UnitID: unit.Unit.ID}
+			if !seen[turn] && unit.CurrentLife > 0 {
+				queues[id] = append(queues[id], turn)
+				seen[turn] = true
+			}
+		}
+	}
+	owners := []uuid.UUID{}
+	for _, id := range s.TurnOrder {
+		if len(queues[id]) > 0 {
+			owners = append(owners, id)
+		}
+	}
+	if len(owners) < 2 {
+		return nil
+	}
+	done := make(map[models.UnitTurn]bool)
+	cursor := make(map[uuid.UUID]int)
+	for _, turn := range played {
+		done[turn] = true
+		for i, candidate := range queues[turn.PlayerID] {
+			if candidate == turn {
+				cursor[turn.PlayerID] = (i + 1) % len(queues[turn.PlayerID])
+			}
+		}
+	}
+	remaining := 0
+	for turn := range seen {
+		if !done[turn] {
+			remaining++
+		}
+	}
+	next := 0
+	if previous == nil {
+		next = rand.Intn(len(owners))
+	} else {
+		for i, owner := range owners {
+			if owner == *previous {
+				next = (i + 1) % len(owners)
+				break
+			}
+		}
+	}
+	result := []models.UnitTurn{}
+	for remaining > 0 {
+		owner := owners[next]
+		queue := queues[owner]
+		index := cursor[owner]
+		for offset := 0; offset < len(queue); offset++ {
+			candidate := (cursor[owner] + offset) % len(queue)
+			if !done[queue[candidate]] {
+				index = candidate
+				break
+			}
+		}
+		turn := queue[index]
+		result = append(result, turn)
+		if !done[turn] {
+			done[turn] = true
+			remaining--
+		}
+		cursor[owner] = (index + 1) % len(queue)
+		next = (next + 1) % len(owners)
+	}
+	return result
 }
 
 func (s *GameSession) turnUnit(turn models.UnitTurn) *models.UnitInstance {
@@ -86,11 +149,15 @@ func (s *GameSession) beginUnitTurn() {
 	s.startTurnClock(TurnDuration)
 }
 
+func (s *GameSession) recalculateTurnOrder() {
+	played := append([]models.UnitTurn{}, s.RoundOrder[:s.RoundTurn+1]...)
+	remaining := s.scheduleTurns(played, s.CurrentTurn)
+	s.RoundOrder = append(played, remaining...)
+}
+
 func (s *GameSession) advanceUnitTurn() {
+	s.recalculateTurnOrder()
 	s.RoundTurn++
-	for s.RoundTurn < len(s.RoundOrder) && s.turnUnit(s.RoundOrder[s.RoundTurn]) == nil {
-		s.RoundTurn++
-	}
 	if s.RoundTurn >= len(s.RoundOrder) {
 		s.startRound()
 	}

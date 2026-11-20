@@ -67,6 +67,9 @@ func (s *GameSession) HasPlayer(id uuid.UUID) bool {
 }
 
 func (s *GameSession) changed(actions ...models.HistoryAction) {
+	if s.Status == models.GameStatusPlaying && s.CurrentTurn != nil && s.RoundTurn < len(s.RoundOrder) {
+		s.recalculateTurnOrder()
+	}
 	if s.Status == models.GameStatusFinished || s.Status == models.GameStatusWaiting {
 		s.clearTurnClock()
 	}

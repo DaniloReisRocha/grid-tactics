@@ -25,7 +25,7 @@ export const TurnControl = () => {
           const unit = owner?.units[unitIndex];
           if (!unit) return null;
           const current = index === roundTurn && Boolean(currentUnitID);
-          return <li key={`${turn.playerID}:${turn.unitID}`}>
+          return <li key={`${index}:${turn.playerID}:${turn.unitID}`}>
             <button type="button" onClick={() => setUnit(turn.unitID)} aria-current={current ? "step" : undefined}
               style={{ opacity: index < roundTurn || unit.currentLife <= 0 ? 0.4 : 1, border: current ? "2px solid #b1de73" : undefined }}>
               {index + 1}. {owner.name} · {unit.currentLife > 0 ? unit.unit.icon : "☠"} {unitIndex + 1}{current ? " · Agora" : ""}
