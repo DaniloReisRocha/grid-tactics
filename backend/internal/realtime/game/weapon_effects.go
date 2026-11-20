@@ -14,6 +14,9 @@ func ValidateWeaponEffects(weapon models.Weapon, distance, attackerHeight, targe
 	if weapon.HasEffect(models.EffectSameLevelID) && attackerHeight != targetHeight {
 		return errors.New("esta arma exige que atacante e alvo estejam no mesmo nível")
 	}
+	if weapon.HasEffect(models.EffectNoHigherTargetsID) && targetHeight > attackerHeight {
+		return errors.New("esta arma só atinge alvos no mesmo nível ou abaixo")
+	}
 	return nil
 }
 
@@ -33,7 +36,7 @@ func WeaponKnockback(weapon models.Weapon, attacker, target models.Position, cel
 		return nil
 	}
 	dx, dy := target.X-attacker.X, target.Y-attacker.Y
-	if (dx == 0 && dy == 0) || (dx != 0 && dy != 0) {
+	if (dx == 0 && dy == 0) || (dx != 0 && dy != 0 && abs(dx) != abs(dy)) {
 		return nil
 	}
 	sign := func(value int) int {
@@ -51,7 +54,11 @@ func WeaponKnockback(weapon models.Weapon, attacker, target models.Position, cel
 		destination := models.Position{X: current.X + sign(dx), Y: current.Y + sign(dy)}
 		from, sourceExists := cells[current]
 		to, exists := cells[destination]
-		if !sourceExists || !exists || occupied[destination] || to.Height > from.Height || !CanTraverse(from, to) {
+		traversable := CanTraverse(from, to)
+		if dx != 0 && dy != 0 {
+			traversable = walkable(from) && walkable(to) && !isBridge(from) && !isBridge(to) && DirectAttackLineClear(current, destination, cells)
+		}
+		if !sourceExists || !exists || occupied[destination] || to.Height > from.Height || !traversable {
 			break
 		}
 		path = append(path, destination)

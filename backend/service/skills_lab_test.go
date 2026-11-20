@@ -184,14 +184,53 @@ func TestLabScenarioGenerationIsDeterministic(t *testing.T) {
 	}
 }
 
-func TestLabRejectsOffAxisTargetsForEveryWeapon(t *testing.T) {
+func TestLabRejectsDistantOffAxisTargetsForEveryWeapon(t *testing.T) {
 	for _, weapon := range models.WeaponOptions() {
-		for _, offset := range []models.Position{{X: 1, Y: 1}, {X: 1, Y: 2}, {X: -1, Y: 1}, {X: 1, Y: -1}, {X: -1, Y: -1}} {
+		for _, offset := range []models.Position{{X: 2, Y: 2}, {X: 1, Y: 2}, {X: -2, Y: 2}, {X: 2, Y: -2}, {X: -2, Y: -2}} {
 			input := labFixture(weapon.ID, 5)
 			input.Tokens[1].Position = models.Position{X: input.Tokens[0].X + offset.X, Y: input.Tokens[0].Y + offset.Y}
 			if _, err := ResolveSkillsLabAttack(input); err == nil {
 				t.Fatalf("%s accepted off-axis target %+v", weapon.ID, offset)
 			}
+		}
+	}
+}
+
+func TestLabSupportsAllAdjacentAttackDirections(t *testing.T) {
+	for _, weapon := range models.WeaponOptions() {
+		for dx := -1; dx <= 1; dx++ {
+			for dy := -1; dy <= 1; dy++ {
+				if dx == 0 && dy == 0 {
+					continue
+				}
+				input := labFixture(weapon.ID, 5)
+				for i := range input.Board {
+					input.Board[i].Height = 0
+					input.Board[i].Object = models.ObjectNone
+					input.Board[i].Terrain = models.TerrainGrass
+				}
+				input.Tokens[1].Position = models.Position{X: input.Tokens[0].X + dx, Y: input.Tokens[0].Y + dy}
+				_, err := ResolveSkillsLabAttack(input)
+				if (err != nil) != (weapon.ID == models.WeaponSniperID) {
+					t.Fatalf("%s at %d,%d: %v", weapon.ID, dx, dy, err)
+				}
+			}
+		}
+	}
+}
+
+func TestLabSniperRespectsRelativeElevation(t *testing.T) {
+	for _, heights := range [][2]int{{0, 1}, {1, 2}, {1, 1}, {2, 2}, {2, 1}, {1, 0}} {
+		input := labFixture(models.WeaponSniperID, 6)
+		input.Board[5*15+4].Height = heights[0]
+		input.Board[5*15+6].Height = heights[1]
+		before := append([]models.SkillToken(nil), input.Tokens...)
+		_, err := ResolveSkillsLabAttack(input)
+		if (err != nil) != (heights[1] > heights[0]) {
+			t.Fatalf("incorrect sniper elevation rule for %v: %v", heights, err)
+		}
+		if !reflect.DeepEqual(before, input.Tokens) {
+			t.Fatal("lab attack mutated input")
 		}
 	}
 }

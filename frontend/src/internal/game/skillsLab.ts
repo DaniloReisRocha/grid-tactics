@@ -14,11 +14,6 @@ export function labAttackProblem(attacker: SkillToken, target: SkillToken | unde
   if (point && board.some((tile)=>tile.x===point.x&&tile.y===point.y&&tile.object==="barricade")) return directAttackProblem(attacker,point,weapon,board);
   if (!target || target.life <= 0) return "Clique em um token vivo da outra equipe.";
   if (attacker.team === target.team) return "Escolha um alvo da outra equipe.";
-  const dx = Math.abs(target.x - attacker.x);
-  const dy = Math.abs(target.y - attacker.y);
-  if (dx !== 0 && dy !== 0) return "O alvo precisa estar na mesma linha ou coluna do atacante.";
-  const distance = dx + dy;
-  if (distance > weapon.range) return "Alvo fora do alcance da arma.";
   const from = board.find((tile) => tile.x === attacker.x && tile.y === attacker.y);
   const to = board.find((tile) => tile.x === target.x && tile.y === target.y);
   if (!from || !to) return "Token fora do mapa.";

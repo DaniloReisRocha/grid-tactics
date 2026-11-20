@@ -7,6 +7,7 @@ const (
 	EffectShieldBreakID             = "shieldBreak"
 	EffectNoAdjacentID              = "noAdjacentTargets"
 	EffectSameLevelID               = "sameLevelOnly"
+	EffectNoHigherTargetsID         = "noHigherTargets"
 	EffectGrantShieldID             = "grantShield"
 	EffectHealAllyID                = "healAlly"
 	EffectCreateBarricadeID         = "createBarricade"
@@ -30,6 +31,7 @@ func EffectOptions() []Effect {
 		{ID: EffectShieldBreakID, Name: "Quebra de escudo", Description: "Quebra todo o escudo restante do alvo após aplicar o dano do golpe."},
 		{ID: EffectNoAdjacentID, Name: "Sem ataques adjacentes", Description: "Não pode atacar unidades adjacentes.", Negative: true},
 		{ID: EffectSameLevelID, Name: "Mesmo nível", Description: "Exige que a origem e o terreno alvo estejam no mesmo nível.", Negative: true},
+		{ID: EffectNoHigherTargetsID, Name: "Sem alvos acima", Description: "Só pode atingir alvos em terrenos do mesmo nível ou abaixo do atacante.", Negative: true},
 		{ID: EffectGrantShieldID, Name: "Conceder escudo", Description: "Concede à unidade a quantidade de escudo definida pela habilidade."},
 		{ID: EffectHealAllyID, Name: "Curar aliado", Description: "Recupera a vida de uma unidade aliada viva, incluindo quem utiliza, sem ultrapassar sua vida máxima."},
 		{ID: EffectCreateBarricadeID, Name: "Conjurar barricada", Description: "Cria uma barricada no terreno alvo, respeitando o limite de barricadas ativas por partida."},

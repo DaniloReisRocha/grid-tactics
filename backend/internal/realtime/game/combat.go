@@ -33,11 +33,11 @@ func (s *GameSession) Attack(id uuid.UUID, unitID string, target models.Position
 	if weapon.Reloading(attacker.TurnCount) {
 		return errors.New("arma em recarga neste turno; a unidade não pode atacar")
 	}
-	dx, dy := abs(attacker.X-target.X), abs(attacker.Y-target.Y)
-	if dx != 0 && dy != 0 {
-		return errors.New("o alvo precisa estar na mesma linha ou coluna do atacante")
+	distance, valid := DirectAttackDistance(attacker.Position, target)
+	if !valid {
+		return errors.New("escolha uma das oito casas vizinhas ou um alvo na mesma linha ou coluna")
 	}
-	if dx+dy > weapon.Range {
+	if distance > weapon.Range {
 		return errors.New("alvo fora de alcance")
 	}
 	cells := make(map[models.Position]models.Cell, len(s.Board))
@@ -46,10 +46,10 @@ func (s *GameSession) Attack(id uuid.UUID, unitID string, target models.Position
 	}
 	from, fromExists := cells[attacker.Position]
 	to, toExists := cells[target]
-	if weapon.HasEffect(models.EffectSameLevelID) && (!fromExists || !toExists) {
+	if (weapon.HasEffect(models.EffectSameLevelID) || weapon.HasEffect(models.EffectNoHigherTargetsID)) && (!fromExists || !toExists) {
 		return errors.New("terreno do atacante ou alvo não encontrado")
 	}
-	if err := ValidateWeaponEffects(weapon, dx+dy, from.Height, to.Height); err != nil {
+	if err := ValidateWeaponEffects(weapon, distance, from.Height, to.Height); err != nil {
 		return err
 	}
 	if !DirectAttackLineClear(attacker.Position, target, cells) {

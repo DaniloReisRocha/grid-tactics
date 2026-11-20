@@ -83,17 +83,10 @@ func ResolveSkillsLabAttack(input models.SkillsLabAttack) (models.SkillsLabResul
 	if weapon.Reloading(attacker.TurnCount) {
 		return result, errors.New("arma em recarga neste turno; avance o turno do token para atacar")
 	}
-	dx, dy := targetPosition.X-attacker.X, targetPosition.Y-attacker.Y
-	abs := func(value int) int {
-		if value < 0 {
-			return -value
-		}
-		return value
+	distance, valid := game.DirectAttackDistance(attacker.Position, targetPosition)
+	if !valid {
+		return result, errors.New("escolha uma das oito casas vizinhas ou um alvo na mesma linha ou coluna")
 	}
-	if dx != 0 && dy != 0 {
-		return result, errors.New("o alvo precisa estar na mesma linha ou coluna do atacante")
-	}
-	distance := abs(dx) + abs(dy)
 	if distance > weapon.Range {
 		return result, errors.New("alvo fora do alcance da arma")
 	}

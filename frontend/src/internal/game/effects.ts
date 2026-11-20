@@ -6,6 +6,7 @@ export const EffectID = {
   shieldBreak: "shieldBreak",
   noAdjacent: "noAdjacentTargets",
   sameLevel: "sameLevelOnly",
+  noHigherTargets: "noHigherTargets",
   grantShield: "grantShield",
   healAlly: "healAlly",
   createBarricade: "createBarricade",
@@ -24,6 +25,10 @@ export function weaponEffectProblem(weapon: Weapon, distance: number, attackerHe
   if (has(EffectID.sameLevel)) {
     if (attackerHeight === undefined || targetHeight === undefined) return "Terreno do atacante ou alvo não encontrado.";
     if (attackerHeight !== targetHeight) return "Esta arma exige que atacante e alvo estejam no mesmo nível.";
+  }
+  if (has(EffectID.noHigherTargets)) {
+    if (attackerHeight === undefined || targetHeight === undefined) return "Terreno do atacante ou alvo não encontrado.";
+    if (targetHeight > attackerHeight) return "Esta arma só atinge alvos no mesmo nível ou abaixo.";
   }
   return null;
 }

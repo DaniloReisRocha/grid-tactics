@@ -21,6 +21,7 @@ export interface MapInteraction {
   area?: readonly { x: number; y: number }[];
   selectable: ReadonlySet<string>;
   attackTargets: ReadonlySet<string>;
+  attackArea?: ReadonlySet<string>;
   onSelect: (tile: MapTile) => void;
   onHover: (tile: MapTile | null) => void;
 }

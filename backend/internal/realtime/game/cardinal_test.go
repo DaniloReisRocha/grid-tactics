@@ -40,7 +40,7 @@ func TestMovementUsesOnlyCardinalSteps(t *testing.T) {
 	}
 }
 
-func TestAttacksRequireSameRowOrColumn(t *testing.T) {
+func TestAttacksAllowAdjacentDiagonalsAndCardinalRange(t *testing.T) {
 	for _, offset := range []models.Position{{X: 2}, {X: -2}, {Y: 2}, {Y: -2}, {X: 1, Y: 1}, {X: -1, Y: 1}, {X: 1, Y: -1}, {X: -1, Y: -1}, {X: 1, Y: 2}} {
 		s, a, b := startedSession(t)
 		attacker := &s.Players[a].Units[0]
@@ -50,7 +50,7 @@ func TestAttacksRequireSameRowOrColumn(t *testing.T) {
 		defender.Position = models.Position{X: 4 + offset.X, Y: 4 + offset.Y}
 		defender.CurrentLife, defender.CurrentShield = 30, 3
 		err := s.Attack(a, "a", defender.Position)
-		aligned := offset.X == 0 || offset.Y == 0
+		aligned := offset.X == 0 || offset.Y == 0 || max(abs(offset.X), abs(offset.Y)) == 1
 		if (err == nil) != aligned {
 			t.Fatalf("offset %+v: %v", offset, err)
 		}

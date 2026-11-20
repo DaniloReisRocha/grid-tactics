@@ -12,6 +12,7 @@ import { labAbilityProblem, abilityArea, applyPassiveAbilities, restoreOrbAbilit
 import { EffectID, weaponReloading } from "@/internal/game/effects";
 import AbilitySelector from "./AbilitySelector";
 import "./styles.css";
+import { attackableArea } from "@/internal/game/attackLine";
 
 type Tool = "select" | "add" | "attack" | "remove" | "paint" | "skill" | "orb";
 const TOOLS: { id: Tool; label: string; hint: string }[] = [
@@ -113,11 +114,14 @@ export default function SkillsLab() {
     return movementOptions(board, labMovementUnit(selected, weapons, baseStamina), units);
   }, [selected, tokens, weapons, board, tool, baseStamina]);
   const attackTargets = new Set<string>();
+  const attackArea = tool === "attack" && selected && selected.life > 0 && selectedWeapon && !weaponReloading(selectedWeapon, selected.turnCount)
+    ? attackableArea(selected, selectedWeapon, board) : new Set<string>();
+  const barricadeTargets = new Set<string>();
   if (tool === "attack" && selected) for (const target of tokens) {
     if (!labAttackProblem(selected, target, board, weapons)) attackTargets.add(positionKey(target));
   }
   if (tool === "attack" && selected) for (const tile of board) {
-    if (tile.object==="barricade"&&!labAttackProblem(selected,undefined,board,weapons,tile)) attackTargets.add(positionKey(tile));
+    if (tile.object==="barricade"&&!labAttackProblem(selected,undefined,board,weapons,tile)) barricadeTargets.add(positionKey(tile));
   }
   const selectable = new Set<string>();
   if (!pending) for (const tile of board) {
@@ -128,7 +132,7 @@ export default function SkillsLab() {
       || (tool === "remove" && (occupied.has(key) || orbs.some((orb) => positionKey(orb) === key)))
       || (tool === "select" && (occupied.has(key) || movement?.paths.has(key)))
       || (tool === "skill" && !labAbilityProblem(selected, activeAbility, board, tokens, matchAbilityUses, tile))
-      || (tool === "attack" && attackTargets.has(key))) selectable.add(key);
+      || (tool === "attack" && (attackTargets.has(key) || barricadeTargets.has(key)))) selectable.add(key);
   }
   const preview = tool === "select" && hovered ? movement?.paths.get(positionKey(hovered)) : undefined;
   const actors: MapActor[] = tokens.flatMap((token) => {
@@ -293,7 +297,7 @@ export default function SkillsLab() {
           <p className="lab-hint" role="status">{pending ? "Preparando o teste…" : tool === "skill" ? `${activeAbility?.name}: clique no terreno alvo. Os destinos válidos estão destacados ao passar o mouse; a granada mostra a área da explosão.` : TOOLS.find((item) => item.id === tool)?.hint}</p>
           {config ? <ProceduralMap key={version} width={15} height={15} tiles={board} actors={actors} orbs={orbs} className="lab-map"
             onOrbComplete={(id) => setOrbs((items) => items.filter((orb) => orb.id !== id))}
-            interaction={{ selectable, attackTargets, onHover: setHovered, onActorTileEnter: triggerOrb, onSelect: (tile) => { void onSelect(tile); },
+            interaction={{ selectable, attackTargets, attackArea: tool === "attack" ? attackArea : undefined, onHover: setHovered, onActorTileEnter: triggerOrb, onSelect: (tile) => { void onSelect(tile); },
               area: tool === "skill" && hovered && selectable.has(positionKey(hovered)) ? abilityArea(activeAbility,hovered,board) : [],
               path: selected && preview ? [{ x: selected.x, y: selected.y }, ...preview] : [] }} />
             : <div className="lab-placeholder">{pending ? "Carregando o mapa e o catálogo de armas…" : "Use Gerar cenário para tentar novamente."}</div>}

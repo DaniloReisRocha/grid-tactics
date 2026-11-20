@@ -11,6 +11,7 @@ import { labAbilityProblem,combatSkillToken,abilityArea } from "@/internal/game/
 import { useGameOrbs } from "./useGameOrbs";
 import { EffectID } from "@/internal/game/effects";
 import TurnTimer from "./TurnTimer";
+import { attackableArea } from "@/internal/game/attackLine";
 
 export const Board = () => {
   const { id, board, players, orbs, turnOrder, unitID, setUnit, movePiece, attackPiece, attackMode,
@@ -29,13 +30,16 @@ export const Board = () => {
   const options = useMemo(() => selected && canAct && !skillMode ? movementOptions(board, selected, units) : null, [board, selected, units, canAct,skillMode]);
   const living = useMemo(() => new Map(units.filter((unit) => unit.currentLife > 0).map((unit) => [positionKey(unit), unit])), [units]);
   const attackTargets = new Set<string>();
+  let attackArea = new Set<string>();
+  const barricadeTargets = new Set<string>();
   if (canAct && attackMode && selected && canUnitAttack(selected)) {
+    attackArea = attackableArea(selected, selected.unit.weapons[0], board);
     for (const unit of living.values()) {
       if (isAttackTarget(selected, unit, board)) {
         attackTargets.add(positionKey(unit));
       }
     }
-    for (const tile of board) if (isBarricadeTarget(selected,tile,board)) attackTargets.add(positionKey(tile));
+    for (const tile of board) if (isBarricadeTarget(selected,tile,board)) barricadeTargets.add(positionKey(tile));
   }
   const selectable = new Set<string>(attackMode || skillMode ? [] : living.keys());
   if (canAct&&skillMode) for(const tile of board) {
@@ -45,6 +49,7 @@ export const Board = () => {
   }
   if (canAct && !attackMode) for (const key of options?.paths.keys() ?? []) selectable.add(key);
   for (const key of attackTargets) selectable.add(key);
+  for (const key of barricadeTargets) selectable.add(key);
   const preview = hovered && !attackMode && !skillMode ? options?.paths.get(positionKey(hovered)) : undefined;
   const previewPath = preview && selected ? [{ x: selected.x, y: selected.y }, ...preview] : [];
   const actors = useMemo(() => units.flatMap((unit): MapActor[] => {
@@ -74,7 +79,7 @@ export const Board = () => {
       topLeftOverlay={<TurnTimer />}
       style={{ flex: "1 1 650px", minWidth: 0, height: "max(540px, calc(100vh - 140px))", borderRadius: 12 }}
       interaction={{
-        path: previewPath, selectable, attackTargets,
+        path: previewPath, selectable, attackTargets, attackArea: attackMode ? attackArea : undefined,
         area:skillMode&&hovered&&selectable.has(positionKey(hovered))?abilityArea(activeSkill,hovered,board):[],
         onHover: setHovered,
         onActorTileEnter: orbView.onActorTileEnter,
@@ -83,7 +88,7 @@ export const Board = () => {
           const unit = living.get(key);
           if(skillMode){if(selected&&canAct&&selectable.has(key))activateAbility(selected.unit.id,skillMode,tile.x,tile.y);return;}
           if (attackMode) {
-            if (attackTargets.has(key) && selected) {
+            if ((attackTargets.has(key) || barricadeTargets.has(key)) && selected) {
               attackPiece(selected.unit.id, tile.x, tile.y);
             }
             return;

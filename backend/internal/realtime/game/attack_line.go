@@ -11,11 +11,31 @@ func BlocksDirectAttack(cell models.Cell) bool {
 	}
 }
 
+// Adjacent diagonals count as distance one; longer attacks stay in a row/column.
+func DirectAttackDistance(from, to models.Position) (int, bool) {
+	dx, dy := abs(to.X-from.X), abs(to.Y-from.Y)
+	if dx == 0 && dy == 0 {
+		return 0, false
+	}
+	if max(dx, dy) == 1 {
+		return 1, true
+	}
+	return dx + dy, dx == 0 || dy == 0
+}
+
 // A barricade can be the target, but no direct attack passes through it.
 func DirectAttackLineClear(from, to models.Position, cells map[models.Position]models.Cell) bool {
 	dx, dy := to.X-from.X, to.Y-from.Y
-	if (dx == 0 && dy == 0) || (dx != 0 && dy != 0) {
+	if _, valid := DirectAttackDistance(from, to); !valid {
 		return false
+	}
+	if dx != 0 && dy != 0 {
+		for _, point := range []models.Position{{X: from.X + dx, Y: from.Y}, {X: from.X, Y: from.Y + dy}} {
+			cell, exists := cells[point]
+			if !exists || BlocksDirectAttack(cell) {
+				return false
+			}
+		}
 	}
 	sign := func(n int) int {
 		if n < 0 {

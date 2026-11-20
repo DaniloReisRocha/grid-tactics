@@ -44,6 +44,7 @@ func WeaponOptions() []Weapon {
 	shieldBreak, _ := EffectByID(EffectShieldBreakID)
 	noAdjacent, _ := EffectByID(EffectNoAdjacentID)
 	reload, _ := EffectByID(EffectReloadID)
+	noHigherTargets, _ := EffectByID(EffectNoHigherTargetsID)
 	sameLevel, _ := EffectByID(EffectSameLevelID)
 	return []Weapon{
 		{
@@ -52,7 +53,7 @@ func WeaponOptions() []Weapon {
 			Name:           "Pistola",
 			Icon:           "🔫",
 			Damage:         1,
-			Range:          2,
+			Range:          3,
 			StaminaPenalty: 0,
 			ToolPenalty:    0,
 			Description:    "Item base do jogo.",
@@ -70,14 +71,14 @@ func WeaponOptions() []Weapon {
 		},
 		{
 			ID:             WeaponSniperID,
-			Effect:         []Effect{noAdjacent, reload},
+			Effect:         []Effect{noAdjacent, reload, noHigherTargets},
 			Name:           "Rifle sniper",
 			Icon:           "🎯",
 			Damage:         3,
 			Range:          5,
 			StaminaPenalty: 1,
 			ToolPenalty:    1,
-			Description:    "Não pode causar dano a unidades adjacentes. Alterna turnos de recarga e ataque, começando com recarga no primeiro turno da unidade.",
+			Description:    "Só atinge alvos no mesmo nível ou abaixo. Não pode causar dano a unidades adjacentes. Alterna turnos de recarga e ataque, começando com recarga no primeiro turno da unidade.",
 		},
 		{
 			ID:             WeaponKatanaID,

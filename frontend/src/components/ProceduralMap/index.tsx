@@ -95,6 +95,7 @@ export default function ProceduralMap({
   const highlightedPath = interaction?.path ?? [];
   const highlightedKeys = new Set(highlightedPath.map((tile) => tileKey(tile.x, tile.y)));
   const areaKeys = new Set((interaction?.area ?? []).map((tile) => tileKey(tile.x, tile.y)));
+  const showingAttackArea = interaction?.attackArea !== undefined;
   const destination = highlightedPath[highlightedPath.length - 1];
 
   const terrainCount = useMemo(() => {
@@ -192,10 +193,11 @@ export default function ProceduralMap({
               const isOnPath = highlightedKeys.has(tileKey(tile.x, tile.y));
               const isInArea = areaKeys.has(tileKey(tile.x, tile.y));
               const selectable = interaction?.selectable.has(tileKey(tile.x, tile.y)) ?? false;
-              const unreachable = isHovered && !selectable;
+              const unreachable = isHovered && !selectable && !showingAttackArea;
               const isDestination = destination?.x === tile.x && destination.y === tile.y;
               const selectedActor = actors?.find((actor) => actor.selected && actor.tile.x === tile.x && actor.tile.y === tile.y);
               const attackTarget = interaction?.attackTargets.has(tileKey(tile.x, tile.y));
+              const inAttackArea = interaction?.attackArea?.has(tileKey(tile.x, tile.y));
 
               return (
                 <pixiContainer
@@ -232,11 +234,11 @@ export default function ProceduralMap({
                       />
                     );
                   })}
-                  {interaction && (isOnPath || isInArea || isHovered || selectedActor || attackTarget) ? (
+                  {interaction && (isOnPath || isInArea || (isHovered && !showingAttackArea) || selectedActor || attackTarget || inAttackArea) ? (
                     <pixiGraphics
                       eventMode="none"
                       draw={(graphics) => {
-                        const color = isInArea ? 0xc49bff : unreachable || attackTarget ? 0xef6c67 : isDestination ? 0xffdc62 : selectedActor ? Number.parseInt(selectedActor.color.slice(1), 16) : 0x78dcb1;
+                        const color = attackTarget ? 0xef6c67 : inAttackArea ? 0xffdc62 : isInArea ? 0xc49bff : unreachable ? 0xef6c67 : isDestination ? 0xffdc62 : selectedActor ? Number.parseInt(selectedActor.color.slice(1), 16) : 0x78dcb1;
                         graphics.clear();
                         graphics.poly([
                           0, markerY - TILE_HEIGHT / 2,
@@ -309,6 +311,9 @@ export default function ProceduralMap({
       {actors.length > 0 ? (
         <div style={styles.characterInfo}>
           <div>{characterError ? "Não foi possível carregar o personagem."
+            : showingAttackArea && hoveredTile ? interaction?.attackArea?.has(tileKey(hoveredTile.x, hoveredTile.y))
+              ? interaction.selectable.has(tileKey(hoveredTile.x, hoveredTile.y)) ? "Clique para atacar" : "Dentro do alcance · Sem alvo válido neste terreno"
+              : "Fora do alcance ou ataque bloqueado"
             : hoveredTile && !interaction?.selectable.has(tileKey(hoveredTile.x, hoveredTile.y)) ? "Destino inacessível"
             : "Selecione uma unidade · Passe o mouse para ver a rota · Clique para agir"}</div>
           <a href="https://axulart.itch.io/small-8-direction-characters" target="_blank" rel="noreferrer" style={{ color: "#a7c875" }}>

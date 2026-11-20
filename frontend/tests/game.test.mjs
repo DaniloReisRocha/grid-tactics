@@ -126,7 +126,8 @@ test("skills lab previews weapon restrictions and reuses movement with limited s
   for (const weapon of weapons) {
     const user = { ...attacker, weaponID: weapon.id };
     assert.equal(labAttackProblem(user, target, board, weapons) === null, weapon.id !== "sniper");
-    assert.ok(labAttackProblem(user, { ...target, y: 6 }, board, weapons));
+    assert.equal(labAttackProblem(user, { ...target, y: 6 }, board, weapons) === null, weapon.id !== "sniper");
+    assert.ok(labAttackProblem(user, { ...target, y: 7 }, board, weapons));
     assert.ok(labAttackProblem(user, { ...target, y: 7 }, board, weapons));
   }
   assert.equal(labAttackProblem({ ...attacker, weaponID: "sniper" }, { ...target, x: 9 }, board, weapons), null);
@@ -403,6 +404,85 @@ test("stamina charges uphill differences only, caps the bonus at 2 and previews 
   assert.equal(movementOptions(board,elevated,[elevated]).costs.get("5,0"),2);
 });
 
+test("attack area includes empty tiles and respects blockers, corners and weapon restrictions", () => {
+  const {attackableArea} = compile("internal/game/attackLine.ts");
+  const board=Array.from({length:49},(_,i)=>({x:i%7,y:Math.floor(i/7),height:0,terrain:"grass"}));
+  const from={x:3,y:3};
+  const pistol={range:2,effect:[]};
+  let area=attackableArea(from,pistol,board);
+  assert.equal(area.size,12); // Eight neighbors plus four cardinal cells at distance two.
+  assert.equal(area.has("3,3"),false);
+  assert.equal(area.has("4,4"),true);
+  assert.equal(area.has("5,5"),false);
+  assert.equal(area.has("5,3"),true);
+  const wall=board[3*7+4];
+  wall.object="house";
+  area=attackableArea(from,pistol,board);
+  for (const key of ["4,3","5,3","4,2","4,4"]) assert.equal(area.has(key),false);
+  assert.equal(area.has("2,4"),true);
+  wall.object="barricade";
+  area=attackableArea(from,pistol,board);
+  assert.equal(area.has("4,3"),true); // Destructible structure remains a targetable tile.
+  assert.equal(area.has("5,3"),false);
+  wall.object=undefined;
+  const sniper=attackableArea(from,{range:5,effect:[{id:"noAdjacentTargets"}]},board);
+  for (const key of ["4,3","3,2","4,4"]) assert.equal(sniper.has(key),false);
+  assert.equal(sniper.has("5,3"),true);
+  board[4*7+4].height=1;
+  assert.equal(attackableArea(from,{range:1,effect:[{id:"sameLevelOnly"}]},board).has("4,4"),false);
+});
+
+test("adjacent attacks allow eight cells and block either structure at a diagonal corner", () => {
+  const {isAttackTarget,isBarricadeTarget} = compile("internal/game/combat.ts");
+  const {labAttackProblem} = compile("internal/game/skillsLab.ts");
+  const weapon={id:"katana",range:1,effect:[{id:"sameLevelOnly"}]};
+  const attacker={x:4,y:4,ownerID:"a",currentLife:3,hasAttacked:false,unit:{weapons:[weapon]}};
+  const token={x:4,y:4,team:0,life:3,weaponID:"katana"};
+  for (const dx of [-1,0,1]) for (const dy of [-1,0,1]) {
+    if (!dx&&!dy) continue;
+    const board=Array.from({length:100},(_,i)=>({x:i%10,y:Math.floor(i/10),height:0,terrain:"grass"}));
+    const target={...attacker,x:4+dx,y:4+dy,ownerID:"b"};
+    assert.equal(isAttackTarget(attacker,target,board),true);
+    assert.equal(labAttackProblem(token,{...target,team:1,life:3},board,[weapon]),null);
+    const targetTile=board[target.y*10+target.x];
+    assert.equal(isBarricadeTarget(attacker,{...targetTile,object:"barricade"},board),true);
+    targetTile.height=1;
+    assert.equal(isAttackTarget(attacker,target,board),false);
+    targetTile.height=0;
+    if (dx&&dy) for (const side of [board[attacker.y*10+target.x],board[target.y*10+attacker.x]]) {
+      for (const object of ["house","ruin","barricade","tree","rock","forest"]) {
+        side.object=object;
+        const blocked=["house","ruin","barricade"].includes(object);
+        assert.equal(isAttackTarget(attacker,target,board),!blocked);
+        assert.equal(Boolean(labAttackProblem(token,{...target,team:1,life:3},board,[weapon])),blocked);
+      }
+      side.object=undefined;
+    }
+    const sniper={id:"sniper",range:5,effect:[{id:"noAdjacentTargets"}]};
+    assert.equal(isAttackTarget({...attacker,unit:{weapons:[sniper]}},target,board),false);
+  }
+});
+
+test("sniper higher-target restriction matches attack previews, highlighted area and lab", () => {
+  const {weaponEffectProblem} = compile("internal/game/effects.ts");
+  const {attackableArea} = compile("internal/game/attackLine.ts");
+  const {isAttackTarget} = compile("internal/game/combat.ts");
+  const {labAttackProblem} = compile("internal/game/skillsLab.ts");
+  const sniper={id:"sniper",range:5,effect:[{id:"noHigherTargets"},{id:"noAdjacentTargets"},{id:"reloadTurn"}]};
+  assert.ok(weaponEffectProblem(sniper,2,undefined,1));
+  for (const fromHeight of [0,1,2]) for (const targetHeight of [0,1,2]) {
+    const board=Array.from({length:49},(_,i)=>({x:i%7,y:Math.floor(i/7),height:fromHeight,terrain:"grass"}));
+    board[3*7+5].height=targetHeight;
+    const attacker={x:3,y:3,ownerID:"a",currentLife:3,turnCount:2,hasAttacked:false,unit:{weapons:[sniper]}};
+    const target={...attacker,x:5,ownerID:"b"};
+    const allowed=targetHeight<=fromHeight;
+    assert.equal(isAttackTarget(attacker,target,board),allowed);
+    assert.equal(attackableArea(attacker,sniper,board).has("5,3"),allowed);
+    const token={...attacker,life:3,team:0,weaponID:"sniper"};
+    assert.equal(labAttackProblem(token,{...target,life:3,team:1},board,[sniper])===null,allowed);
+  }
+});
+
 test("reload effect blocks targets on first and odd own turns while remaining reusable", () => {
   const {weaponReloading} = compile("internal/game/effects.ts");
   const {canUnitAttack,isAttackTarget,isBarricadeTarget} = compile("internal/game/combat.ts");
@@ -437,7 +517,8 @@ test("attack availability and targets ignore stamina and staminaPenalty, but enf
   assert.equal(isAttackTarget(attacker,{...target,ownerID:"a"}),false);
   assert.equal(isAttackTarget(attacker,{...target,currentLife:0}),false);
   for (const [x,y] of [[2,0],[-2,0],[0,2],[0,-2]]) assert.equal(isAttackTarget(attacker,{...target,x,y}),true);
-  for (const [x,y] of [[1,1],[-1,1],[1,-1],[-1,-1],[1,2]]) assert.equal(isAttackTarget(attacker,{...target,x,y}),false);
+  for (const [x,y] of [[1,1],[-1,1],[1,-1],[-1,-1]]) assert.equal(isAttackTarget(attacker,{...target,x,y}),true);
+  for (const [x,y] of [[1,2],[2,2]]) assert.equal(isAttackTarget(attacker,{...target,x,y}),false);
   assert.equal(canUnitAttack({...attacker,hasAttacked:true}),false);
   assert.equal(isAttackTarget({...attacker,hasAttacked:true},target),false);
   assert.equal(canUnitAttack({...attacker,currentLife:0}),false);
