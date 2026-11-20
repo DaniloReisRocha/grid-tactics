@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"github.com/DaniloReisRocha/grid-tactics/backend/internal/env"
+	"github.com/DaniloReisRocha/grid-tactics/backend/internal/realtime/game"
 	"github.com/DaniloReisRocha/grid-tactics/backend/server"
 	"github.com/DaniloReisRocha/grid-tactics/backend/server/handler"
+	"github.com/DaniloReisRocha/grid-tactics/backend/service"
 	_ "github.com/lib/pq"
 
 	"github.com/jmoiron/sqlx"
@@ -20,6 +22,16 @@ func main() {
 	if err := env.Init(); err != nil {
 		log.Fatalf("Failed to load envs: %v", err)
 	}
+	historyDirectory := os.Getenv("HISTORY_DIR")
+	if historyDirectory == "" {
+		historyDirectory = "historico"
+	}
+	sessions, err := game.NewSessionManagerWithHistory(historyDirectory)
+	if err != nil {
+		log.Fatalf("Failed to initialize match history: %v", err)
+	}
+	service.SessionManager = sessions
+	defer sessions.Close()
 
 	psqlInfo := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		env.DB.Host(), env.DB.Port(), env.DB.User(), env.DB.Password(), env.DB.Name())

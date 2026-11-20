@@ -126,6 +126,22 @@ O rascunho é salvo no `sessionStorage` da aba. Ao entrar, a formação também 
 
 As habilidades equipadas aparecem no painel da unidade durante o combate. Escudo aparece como **Passiva**, sem botão de ativação. As habilidades ativas permitem selecionar o terreno alvo, com prévia da área da granada. Só a unidade ativa pode usá-las, estando viva e com a habilidade equipada. O combate e o laboratório compartilham a resolução dos efeitos em `backend/internal/realtime/game/ability_effects.go`. Usar uma habilidade não consome o ataque nem estamina, e finalizar o turno não renova usos únicos. A granada mantém o limite de uma utilização por unidade na partida e pode eliminar unidades aliadas, inclusive encerrando a partida sem vencedor se eliminar ambos os times. Se ela eliminar apenas a unidade ativa, o turno avança automaticamente.
 
+## Histórico local das partidas
+
+O servidor cria automaticamente um arquivo JSON por saguão em `historico/`, relativo ao diretório de execução. Ao iniciar o backend dentro de `backend`, os arquivos ficam em `backend/historico`. É possível definir outro caminho com `HISTORY_DIR` no arquivo de ambiente do backend. Os históricos gerados são ignorados pelo Git.
+
+Cada arquivo recebe data/hora UTC e um UUID no nome. Reutilizar um código de sala depois de remover a sessão cria outro arquivo, sem sobrescrever a partida anterior. O histórico começa na criação do saguão e é atualizado após cada alteração confirmada, inclusive enquanto a partida estiver incompleta.
+
+O formato possui `schemaVersion`, identificação da partida e do saguão, seed, capacidade, duração do turno, datas, status, vencedor, `initialState`, `latestState`, `lobbyEvents` e `rounds`. Cada rodada contém `turns`, com número global do turno, posição na ordem da rodada (`roundSlot`, começando em zero), jogador, unidade, horários, motivo do encerramento, estado inicial e `events`.
+
+Cada evento registra uma sequência global crescente, revisão, horário UTC, tipo de ação, jogador, unidade, habilidade e destino quando aplicáveis, além de `state`: o estado completo após a ação. Os estados incluem jogadores e equipes com suas definições de armas/habilidades/efeitos, mapa e elevações, posições e caminhos, vida, escudo, estamina, usos de habilidades, recarga, ordem sorteada dos turnos, orbs, explosões e relógio. Conexões WebSocket e credenciais do servidor não são serializadas.
+
+Movimentação, ataques, habilidades, encerramentos manuais e por tempo, desconexões, reconexões, desistências e fechamento da sessão ficam registrados. Comandos rejeitados não geram eventos. A ação que encerra um turno pertence ao turno que estava ativo antes dela; seu `state` já pode apresentar a próxima unidade. O primeiro turno recebe como `initialState` o resultado da entrada do último jogador, registrado em `lobbyEvents`.
+
+Para uma futura ferramenta de replay, comece em `initialState` e reproduza os eventos de `lobbyEvents` e `rounds[].turns[].events` pela ordem de `sequence`, aplicando cada `state`. Os horários permitem preservar os intervalos, e os caminhos permitem reproduzir os deslocamentos. O resultado independe de sortear novamente a ordem dos turnos ou executar uma versão futura das regras. `latestState` permite consultar diretamente o último estado salvo; a interface de replay ainda não está implementada.
+
+A gravação usa arquivo temporário, sincronização em disco e substituição do arquivo anterior. Falhas de gravação são registradas no log e os eventos permanecem em memória para nova tentativa na próxima alteração. No encerramento normal do servidor, as sessões são fechadas e gravadas novamente. Se o diretório de histórico não puder ser preparado para escrita, o servidor informa o erro e não inicia.
+
 ## Verificações
 
 No frontend:

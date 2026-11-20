@@ -21,6 +21,7 @@ type PlayerState struct {
 }
 
 type GameSession struct {
+	history          *matchRecorder
 	GrenadeEvent     *models.GrenadeEvent
 	TurnDeadline     time.Time
 	turnRemaining    time.Duration
@@ -65,19 +66,45 @@ func (s *GameSession) HasPlayer(id uuid.UUID) bool {
 	return exists
 }
 
-func (s *GameSession) changed() {
+func (s *GameSession) changed(actions ...models.HistoryAction) {
 	if s.Status == models.GameStatusFinished || s.Status == models.GameStatusWaiting {
 		s.clearTurnClock()
 	}
 	s.Revision++
 	s.LastAction = time.Now()
+	if s.history != nil {
+		action := models.HistoryAction{Type: models.HistoryStateChange}
+		if len(actions) > 0 {
+			action = actions[0]
+		}
+		s.recordHistory(action)
+	}
 }
 
 // Snapshot under the session lock; serialize/send outside it so clients cannot block gameplay.
 func (s *GameSession) BroadcastState() error {
 	s.lock.RLock()
-	players := make(map[uuid.UUID]*models.Player, len(s.Players))
+	payload := s.snapshot()
 	connections := make([]*realtime.WSConnection, 0, len(s.Players))
+	for _, p := range s.Players {
+		if p.Connection != nil {
+			connections = append(connections, p.Connection)
+		}
+	}
+	s.lock.RUnlock()
+	var failures []error
+	for _, conn := range connections {
+		if err := conn.Send(realtime.ActionSent{Type: gameStateUpdate, Payload: payload}); err != nil {
+			failures = append(failures, err)
+			conn.Close()
+		}
+	}
+	return errors.Join(failures...)
+}
+
+// Caller holds the session lock. History serializes this snapshot before unlock.
+func (s *GameSession) snapshot() models.GameStatePayload {
+	players := make(map[uuid.UUID]*models.Player, len(s.Players))
 	for id, p := range s.Players {
 		copyPlayer := p.Player
 		copyPlayer.Units = append([]models.UnitInstance{}, p.Units...)
@@ -85,9 +112,6 @@ func (s *GameSession) BroadcastState() error {
 			copyPlayer.Units[i].AbilityUses = maps.Clone(copyPlayer.Units[i].AbilityUses)
 		}
 		players[id] = &copyPlayer
-		if p.Connection != nil {
-			connections = append(connections, p.Connection)
-		}
 	}
 	var turn, winner *uuid.UUID
 	if s.CurrentTurn != nil {
@@ -118,15 +142,7 @@ func (s *GameSession) BroadcastState() error {
 		payload.TurnDeadlineMS = s.TurnDeadline.UnixMilli()
 		payload.TurnRemainingMS = max(0, time.Until(s.TurnDeadline).Milliseconds())
 	}
-	s.lock.RUnlock()
-	var failures []error
-	for _, conn := range connections {
-		if err := conn.Send(realtime.ActionSent{Type: gameStateUpdate, Payload: payload}); err != nil {
-			failures = append(failures, err)
-			conn.Close()
-		}
-	}
-	return errors.Join(failures...)
+	return payload
 }
 
 func (s *GameSession) AddPlayer(conn *realtime.WSConnection, id uuid.UUID, units []models.Unit) error {
@@ -143,7 +159,7 @@ func (s *GameSession) AddPlayer(conn *realtime.WSConnection, id uuid.UUID, units
 			s.Status = models.GameStatusPlaying
 			s.startTurnClock(s.turnRemaining)
 		}
-		s.changed()
+		s.changed(models.HistoryAction{Type: models.HistoryReconnect, PlayerID: &id})
 		return nil
 	}
 	if s.Status != models.GameStatusWaiting || len(s.Players) >= s.maximumPlayers {
@@ -193,7 +209,7 @@ func (s *GameSession) AddPlayer(conn *realtime.WSConnection, id uuid.UUID, units
 		s.startRound()
 		s.beginUnitTurn()
 	}
-	s.changed()
+	s.changed(models.HistoryAction{Type: models.HistoryJoin, PlayerID: &id})
 	return nil
 }
 

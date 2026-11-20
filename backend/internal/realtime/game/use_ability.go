@@ -94,6 +94,6 @@ func (s *GameSession) UseAbility(id uuid.UUID, unitID, abilityID string, target 
 		s.advanceUnitTurn()
 	}
 	s.spawnMilestoneOrbs()
-	s.changed()
+	s.changed(models.HistoryAction{Type: models.HistoryAbility, PlayerID: &id, UnitID: unitID, AbilityID: abilityID, Target: &target})
 	return nil
 }

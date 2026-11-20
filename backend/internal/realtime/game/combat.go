@@ -63,7 +63,7 @@ func (s *GameSession) Attack(id uuid.UUID, unitID string, target models.Position
 			}
 		}
 		attacker.HasAttacked = true
-		s.changed()
+		s.changed(models.HistoryAction{Type: models.HistoryAttack, PlayerID: &id, UnitID: unitID, Target: &target})
 		return nil
 	}
 	for owner, enemy := range s.Players {
@@ -100,7 +100,7 @@ func (s *GameSession) Attack(id uuid.UUID, unitID string, target models.Position
 				s.CurrentUnitID = ""
 			}
 			s.spawnMilestoneOrbs()
-			s.changed()
+			s.changed(models.HistoryAction{Type: models.HistoryAttack, PlayerID: &id, UnitID: unitID, Target: &target})
 			return nil
 		}
 	}

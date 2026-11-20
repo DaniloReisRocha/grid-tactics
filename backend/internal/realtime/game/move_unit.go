@@ -38,7 +38,7 @@ func (s *GameSession) MovePiece(id uuid.UUID, unitID string, to models.Position)
 		unit.CurrentStamina -= cost
 		s.collectOrbs(unit, path)
 		s.spawnMilestoneOrbs()
-		s.changed()
+		s.changed(models.HistoryAction{Type: models.HistoryMove, PlayerID: &id, UnitID: unitID, Target: &to})
 		return nil
 	}
 	return errors.New("unidade não pertence ao jogador")

@@ -17,9 +17,10 @@ func (s *GameSession) EndTurn(id uuid.UUID, expectedTurn ...int) error {
 	if _, err := s.actingPlayer(id); err != nil {
 		return err
 	}
+	action := models.HistoryAction{Type: models.HistoryEndTurn, PlayerID: &id, UnitID: s.CurrentUnitID}
 	s.advanceUnitTurn()
 	s.spawnMilestoneOrbs()
-	s.changed()
+	s.changed(action)
 	return nil
 }
 
@@ -136,7 +137,11 @@ func (s *GameSession) Disconnect(conn *realtime.WSConnection, leave bool) {
 				s.CurrentUnitID = ""
 			}
 		}
-		s.changed()
+		actionType := models.HistoryDisconnect
+		if leave {
+			actionType = models.HistoryLeave
+		}
+		s.changed(models.HistoryAction{Type: actionType, PlayerID: &id})
 		break
 	}
 	s.lock.Unlock()

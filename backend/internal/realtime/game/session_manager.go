@@ -7,8 +7,9 @@ import (
 )
 
 type SessionManager struct {
-	sessions map[string]*GameSession
-	lock     *sync.RWMutex
+	historyDirectory string
+	sessions         map[string]*GameSession
+	lock             *sync.RWMutex
 }
 
 func NewSessionManager() *SessionManager {
@@ -27,6 +28,9 @@ func (sm *SessionManager) CreateSession(id string) *GameSession {
 	}
 
 	session := NewGameSession(id, 2)
+	if sm.historyDirectory != "" {
+		session.enableHistory(sm.historyDirectory)
+	}
 	sm.sessions[id] = session
 	return session
 }
@@ -37,6 +41,15 @@ func (sm *SessionManager) GetSession(id string) (*GameSession, bool) {
 
 	session, ok := sm.sessions[id]
 	return session, ok
+}
+
+// Close flushes archives and releases clocks during server shutdown.
+func (sm *SessionManager) Close() {
+	sm.lock.Lock()
+	defer sm.lock.Unlock()
+	for _, session := range sm.sessions {
+		session.Close()
+	}
 }
 
 func (sm *SessionManager) FindSessionByConn(conn *realtime.WSConnection) *GameSession {

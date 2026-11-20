@@ -45,9 +45,10 @@ func (s *GameSession) expireTurn(generation uint64) {
 		s.lock.Unlock()
 		return
 	}
+	action := models.HistoryAction{Type: models.HistoryTimeout, PlayerID: s.CurrentTurn, UnitID: s.CurrentUnitID}
 	s.advanceUnitTurn()
 	s.spawnMilestoneOrbs()
-	s.changed()
+	s.changed(action)
 	s.lock.Unlock()
 	_ = s.BroadcastState()
 }
@@ -56,6 +57,12 @@ func (s *GameSession) expireTurn(generation uint64) {
 func (s *GameSession) Close() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
+	if s.closed {
+		return
+	}
 	s.closed = true
 	s.clearTurnClock()
+	if s.history != nil {
+		s.changed(models.HistoryAction{Type: models.HistoryClose})
+	}
 }

@@ -33,7 +33,7 @@ export const Home = () => {
       setError("Informe um UUID de conta válido ou gere uma conta de teste.");
       return;
     }
-    if (!session || session.length > 100) { setError("Informe uma sessão de até 100 caracteres."); return; }
+    if (!session || session.length > 100) { setError("Informe um código de sala de até 100 caracteres."); return; }
     if (!options || teamProblem || loading) { setError(teamProblem ?? "Aguarde o catálogo de equipamentos."); return; }
     try { sessionStorage.setItem("grid-tactics.account", account); saveMatchTeam(session, account, team); }
     catch { setError("Não foi possível salvar a equipe nesta aba. Habilite o armazenamento do navegador para entrar."); return; }
@@ -57,9 +57,10 @@ export const Home = () => {
         <label htmlFor="account">Conta (UUID)</label>
         <input id="account" value={accountID} onChange={(event) => setAccountID(event.target.value)} required />
         <button className="team-account-button" type="button" onClick={() => { setAccountID(crypto.randomUUID()); setError(null); }}>Gerar conta de teste</button>
-        <label htmlFor="session">Sessão</label>
-        <input id="session" value={sessionID} onChange={(event) => setSessionID(event.target.value)} maxLength={100} required />
-          <p>Para jogar em duas abas, use a mesma sessão e contas diferentes.</p>
+        <label htmlFor="session">Código da sala</label>
+        <input id="session" value={sessionID} onChange={(event) => setSessionID(event.target.value)} placeholder="Digite ou gere um código" maxLength={100} required />
+        <button className="team-account-button" type="button" onClick={() => { setSessionID(crypto.randomUUID().slice(0, 8).toUpperCase()); setError(null); }}>Gerar código da sala</button>
+          <p>Para jogar em duas abas, use o mesmo código da sala e contas diferentes.</p>
           <dl className="team-join-summary"><div><dt>Unidades</dt><dd>{team.length}/3</dd></div><div><dt>Armas</dt><dd>{team.filter((unit) => unit.weaponID).length}</dd></div><div><dt>Habilidades equipadas</dt><dd>{team.reduce((sum, unit) => sum + unit.abilityIDs.filter(Boolean).length, 0)}</dd></div></dl>
           {error ? <p className="team-alert" role="alert">{error}</p> : null}
           <button className="team-enter" type="submit" disabled={loading || !options || !!catalogError || !!teamProblem}>Entrar com esta equipe</button>
